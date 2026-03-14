@@ -1082,7 +1082,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
   );
 
   const handleTagConfirm = useCallback(
-    (pid: string, tags: string[]) => {
+    async (pid: string, tags: string[]) => {
       const ctx = addCtxRef.current;
       if (!ctx) return;
       const card = {
@@ -1098,7 +1098,8 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
         lastSeenAt: NOW(),
       };
       dispatch({ type: "ADD", card });
-      void supabase.from("notecards").insert(cardToRow(card, userId));
+      const { error } = await supabase.from("notecards").insert(cardToRow(card, userId));
+      if (error) console.error("Supabase insert error:", error);
       setSavedCardId(card.id);
       setTimeout(() => setSavedCardId(null), 800);
       const existing = cardsRef.current.slice(0, 40);
@@ -1125,7 +1126,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
     setTagDrawer(null);
   }, []);
 
-  const handleImportConfirm = useCallback((pid: string, quotes: any[]) => {
+  const handleImportConfirm = useCallback(async (pid: string, quotes: any[]) => {
     const newCards = quotes.map((q) => ({
       id: uid(),
       quote: q.quote,
@@ -1138,10 +1139,11 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
       createdAt: NOW(),
       lastSeenAt: NOW(),
     }));
-    newCards.forEach((card) => {
+    for (const card of newCards) {
       dispatch({ type: "ADD", card });
-      void supabase.from("notecards").insert(cardToRow(card, userId));
-    });
+      const { error } = await supabase.from("notecards").insert(cardToRow(card, userId));
+      if (error) console.error("Supabase insert error:", error);
+    }
     setMessages((p) =>
       p.map((m) =>
         m.id === pid
@@ -1171,10 +1173,11 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
   }, []);
 
   const runDemo = useCallback(async () => {
-    DEMO_CARDS.forEach((card) => {
+    for (const card of DEMO_CARDS) {
       dispatch({ type: "ADD", card });
-      void supabase.from("notecards").insert(cardToRow(card, userId));
-    });
+      const { error } = await supabase.from("notecards").insert(cardToRow(card, userId));
+      if (error) console.error("Supabase insert error:", error);
+    }
     setMessages((p) => [...p, mkMsg("user", { type: "text", text: "/tension habits" })]);
     setLoading(true);
     setLL("hunting for contradictions…");
