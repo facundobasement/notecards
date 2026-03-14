@@ -1561,6 +1561,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
     onCreateCollection: createCollection,
     onElaborate: handleElaborate,
     savedCardId,
+    inputContainerRef,
   };
 
   return (

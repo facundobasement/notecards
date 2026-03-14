@@ -589,15 +589,32 @@ export const AnnotationDrawer = memo(function AnnotationDrawer({
   card,
   onSave,
   onClose,
+  inputContainerRef,
 }: {
   card: CardLike;
   onSave: (note: string) => void;
   onClose: () => void;
+  inputContainerRef?: React.RefObject<HTMLDivElement | null>;
 }) {
   const C = useC();
   const T = makeT(C);
   const [text, setText] = useState(card.note ?? "");
+  const [visible, setVisible] = useState(false);
+  const [drawerStyle, setDrawerStyle] = useState<{ left: number; width?: number }>({
+    left: 0,
+    width: undefined,
+  });
   const taRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (inputContainerRef?.current) {
+      const rect = inputContainerRef.current.getBoundingClientRect();
+      setDrawerStyle({ left: rect.left, width: rect.width });
+    }
+    const t = requestAnimationFrame(() => setVisible(true));
+    return () => cancelAnimationFrame(t);
+  }, [inputContainerRef]);
+
   useEffect(() => {
     const t = setTimeout(() => taRef.current?.focus(), 120);
     return () => clearTimeout(t);
@@ -624,24 +641,28 @@ export const AnnotationDrawer = memo(function AnnotationDrawer({
           inset: 0,
           zIndex: 300,
           background: "rgba(0,0,0,0.15)",
-          animation: "backdropIn 0.2s ease",
+          opacity: visible ? 1 : 0,
+          transition: "opacity 0.2s ease",
         }}
       />
       <div
         style={{
           position: "fixed",
           bottom: 0,
-          left: 0,
-          right: 0,
+          left: drawerStyle.left ?? 0,
+          width: drawerStyle.width ?? "100%",
           zIndex: 301,
           background: C.base,
           borderTop: `1px solid ${C.border}`,
+          borderLeft: drawerStyle.width != null ? `1px solid ${C.border}` : undefined,
+          borderRight: drawerStyle.width != null ? `1px solid ${C.border}` : undefined,
           borderRadius: `${R.xl}px ${R.xl}px 0 0`,
           boxShadow: "0 -8px 40px rgba(0,0,0,0.1)",
           maxHeight: "70vh",
           display: "flex",
           flexDirection: "column",
-          animation: "drawerUp 0.28s cubic-bezier(0.32,0.72,0,1)",
+          transform: visible ? "translateY(0)" : "translateY(100%)",
+          transition: "transform 0.28s cubic-bezier(0.32,0.72,0,1)",
         }}
       >
         <div
@@ -1456,6 +1477,7 @@ type NoteCardProps = {
   selected?: boolean;
   onSelect?: (id: string) => void;
   justSaved?: boolean;
+  inputContainerRef?: React.RefObject<HTMLDivElement | null>;
 };
 
 export const NoteCard = memo(function NoteCard({
@@ -1473,10 +1495,12 @@ export const NoteCard = memo(function NoteCard({
   selected = false,
   onSelect,
   justSaved = false,
+  inputContainerRef,
 }: NoteCardProps) {
   const C = useC();
   const T = makeT(C);
   const [showAnnotation, setShowAnnotation] = useState(false);
+  const [showTagPicker, setShowTagPicker] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showCollPicker, setShowCollPicker] = useState(false);
   const [editQuote, setEditQuote] = useState(card.quote);
@@ -1544,6 +1568,21 @@ export const NoteCard = memo(function NoteCard({
           card={card}
           onSave={(note) => onUpdate(card.id, { note })}
           onClose={() => setShowAnnotation(false)}
+          inputContainerRef={inputContainerRef}
+        />
+      )}
+      {showTagPicker && (
+        <TagPickerDrawer
+          suggestedTags={card.tags ?? []}
+          quote={card.quote}
+          book={card.book}
+          author={card.author}
+          onConfirm={(tags) => {
+            onTagsChange(card.id, tags);
+            setShowTagPicker(false);
+          }}
+          onDiscard={() => setShowTagPicker(false)}
+          inputContainerRef={inputContainerRef}
         />
       )}
       <div
@@ -1760,10 +1799,34 @@ export const NoteCard = memo(function NoteCard({
             ))}
           </div>
         ) : (
-          <TagEditor
-            tags={card.tags ?? []}
-            onChange={(tags) => onTagsChange(card.id, tags)}
-          />
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            {(card.tags ?? []).map((t) => (
+              <Tag key={t}>{t}</Tag>
+            ))}
+            <button
+              onClick={() => setShowTagPicker(true)}
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                color: C.faint,
+                padding: "1px 2px",
+                display: "inline-flex",
+                transition: "color 0.15s",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = C.muted)}
+              onMouseLeave={(e) => (e.currentTarget.style.color = C.faint)}
+            >
+              <Pencil size={10} />
+            </button>
+          </div>
         )}
 
         {!selectable && (
@@ -4526,6 +4589,7 @@ export const LibraryPanel = memo(function LibraryPanel({
   onRandom,
   onExport,
   allCards,
+  inputContainerRef,
 }: Omit<NoteCardProps, "card"> & {
   cards: CardLike[];
   themes: ThemeItem[];
@@ -4605,6 +4669,7 @@ export const LibraryPanel = memo(function LibraryPanel({
     onCreateCollection,
     onElaborate,
     allCards: allCards ?? cards,
+    inputContainerRef,
   };
 
   return (
@@ -5249,6 +5314,7 @@ export const MsgBubble = memo(function MsgBubble({
   onImportDiscard,
   onReadingNote,
   savedCardId,
+  inputContainerRef,
 }: {
   m: Message;
   collections: Collection[];
@@ -5264,6 +5330,7 @@ export const MsgBubble = memo(function MsgBubble({
   onImportDiscard: (id: string) => void;
   onReadingNote?: (cardId: string, note: string) => void;
   savedCardId: string | null;
+  inputContainerRef?: React.RefObject<HTMLDivElement | null>;
 }) {
   const C = useC();
   const T = makeT(C);
@@ -5297,6 +5364,7 @@ export const MsgBubble = memo(function MsgBubble({
     onElaborate,
     allCards,
     savedCardId,
+    inputContainerRef,
   };
   return (
     <div>
