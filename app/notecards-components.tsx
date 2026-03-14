@@ -4399,17 +4399,21 @@ export const RandomCard = memo(function RandomCard({
         onClick={onClose}
         style={{
           position: "absolute",
-          top: 20,
-          right: 20,
-          width: 32,
-          height: 32,
-          borderRadius: "50%",
+          bottom: 32,
+          left: "50%",
+          transform: "translateX(-50%)",
+          padding: "8px 16px",
+          borderRadius: 99,
           border: `1px solid ${C.border}`,
           background: "transparent",
           cursor: "pointer",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          gap: 6,
+          fontSize: 13,
+          fontFamily: FONT_SANS,
+          fontWeight: 500,
           color: C.faint,
           transition: "all 0.15s",
         }}
@@ -4423,6 +4427,7 @@ export const RandomCard = memo(function RandomCard({
         }}
       >
         <X size={13} />
+        Close
       </button>
       <div
         style={{
