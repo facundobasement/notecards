@@ -79,8 +79,8 @@ const rowToCard = (row: NotecardRow) => ({
   tags: row.tags ?? [],
   note: row.note ?? "",
   collectionIds: row.collection_ids ?? [],
-  createdAt: row.created_at ? new Date(row.created_at).getTime() : NOW(),
-  lastSeenAt: row.last_seen_at ? new Date(row.last_seen_at).getTime() : NOW(),
+  createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
+  lastSeenAt: row.last_seen_at ? new Date(row.last_seen_at).getTime() : Date.now(),
 });
 
 const cardToRow = (card: any, userId: string): NotecardRow => ({
@@ -93,10 +93,8 @@ const cardToRow = (card: any, userId: string): NotecardRow => ({
   tags: card.tags ?? [],
   note: card.note || null,
   collection_ids: card.collectionIds ?? [],
-  created_at: new Date(card.createdAt || NOW()).toISOString(),
-  last_seen_at: card.lastSeenAt
-    ? new Date(card.lastSeenAt).toISOString()
-    : new Date(card.createdAt || NOW()).toISOString(),
+  created_at: new Date(card.createdAt || Date.now()).toISOString(),
+  last_seen_at: new Date(card.lastSeenAt || card.createdAt || Date.now()).toISOString(),
 });
 
 // ─── Cards reducer ────────────────────────────────────────────────────────────
