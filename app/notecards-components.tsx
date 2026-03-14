@@ -4399,7 +4399,7 @@ export const RandomCard = memo(function RandomCard({
         onClick={onClose}
         style={{
           position: "absolute",
-          bottom: 32,
+          top: 20,
           left: "50%",
           transform: "translateX(-50%)",
           padding: "8px 16px",
