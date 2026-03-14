@@ -733,6 +733,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
   const [themes, setThemes] = useState<any[]>([]);
   const [dark, setDark] = useState(false);
   const [storageLoaded, setStorageLoaded] = useState(false);
+  const [cardsLoading, setCardsLoading] = useState(true);
 
   const [pendingThemes, setPendingThemes] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
@@ -812,6 +813,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
       if (Array.isArray(locThemes)) setThemes(locThemes);
       if (typeof locDark === "boolean") setDark(locDark);
       setStorageLoaded(true);
+      setCardsLoading(false);
     }
     load();
   }, [userId]);
@@ -1497,7 +1499,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
     if (themeTimerRef.current) clearTimeout(themeTimerRef.current);
   }, []);
 
-  const showEmpty = cards.length === 0 && messages.length === 0;
+  const showEmpty = !cardsLoading && cards.length === 0 && messages.length === 0;
   const hasInput = input.trim().length > 0;
   const msgCardProps = {
     collections,
@@ -1612,7 +1614,11 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
           }}
         >
           <div style={{ flex: 1, paddingBottom: 28 }}>
-            {showEmpty ? (
+            {cardsLoading ? (
+              <div style={{ display: "flex", minHeight: "82vh", alignItems: "center", justifyContent: "center" }}>
+                <p style={{ fontSize: 14, color: C.faint, fontFamily: FONT_SANS }}>Loading your library…</p>
+              </div>
+            ) : showEmpty ? (
               <EmptyState
                 onSave={() => {
                   setInput("/add ");
