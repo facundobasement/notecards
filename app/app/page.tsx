@@ -84,15 +84,3 @@ export default function AppPage() {
     </div>
   );
 }
-```
-
----
-
-Once you've pasted and saved it (**Cmd+S**), test it with `npm run dev` and check that the sign out button appears in the top right corner.
-
-When you're happy, push it live:
-```
-git add .
-git commit -m "add sign out button"
-git push
-
