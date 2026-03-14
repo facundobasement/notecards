@@ -5295,7 +5295,7 @@ export const MsgBubble = memo(function MsgBubble({
   };
   return (
     <div>
-      {m.type === "saved" && (
+      {m.type === "saved" && m.liveCard && (
         <div>
           <div
             style={{
@@ -5303,13 +5303,11 @@ export const MsgBubble = memo(function MsgBubble({
               paddingLeft: 20,
             }}
           >
-            {m.liveCard && (
-              <NoteCard
-                card={m.liveCard}
-                {...cardProps}
-                justSaved={m.liveCard?.id === savedCardId}
-              />
-            )}
+            <NoteCard
+              card={m.liveCard}
+              {...cardProps}
+              justSaved={m.liveCard?.id === savedCardId}
+            />
           </div>
           <ConnectionNotice
             connections={m.connections ?? undefined}
