@@ -766,6 +766,197 @@ export const AnnotationDrawer = memo(function AnnotationDrawer({
   );
 });
 
+export const QuoteEditDrawer = memo(function QuoteEditDrawer({
+  card,
+  onSave,
+  onClose,
+  inputContainerRef,
+}: {
+  card: CardLike;
+  onSave: (quote: string, book: string, author: string) => void;
+  onClose: () => void;
+  inputContainerRef?: React.RefObject<HTMLDivElement | null>;
+}) {
+  const C = useC();
+  const T = makeT(C);
+  const [quote, setQuote] = useState(card.quote);
+  const [book, setBook] = useState(card.book);
+  const [author, setAuthor] = useState(card.author ?? "");
+  const [visible, setVisible] = useState(false);
+  const [drawerStyle, setDrawerStyle] = useState<{ left: number; width?: number }>({
+    left: 0,
+    width: undefined,
+  });
+  const quoteRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (inputContainerRef?.current) {
+      const rect = inputContainerRef.current.getBoundingClientRect();
+      setDrawerStyle({ left: rect.left, width: rect.width });
+    }
+    const t = requestAnimationFrame(() => setVisible(true));
+    return () => cancelAnimationFrame(t);
+  }, [inputContainerRef]);
+
+  useEffect(() => {
+    setQuote(card.quote);
+    setBook(card.book);
+    setAuthor(card.author ?? "");
+  }, [card.quote, card.book, card.author]);
+
+  useEffect(() => {
+    const t = setTimeout(() => quoteRef.current?.focus(), 120);
+    return () => clearTimeout(t);
+  }, []);
+
+  useKey("Escape", onClose, [onClose]);
+
+  const handleSave = () => {
+    if (!quote.trim() || !book.trim()) return;
+    onSave(quote.trim(), book.trim(), author.trim());
+    onClose();
+  };
+
+  return (
+    <>
+      <div
+        onClick={onClose}
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 300,
+          background: "rgba(0,0,0,0.15)",
+          opacity: visible ? 1 : 0,
+          transition: "opacity 0.2s ease",
+        }}
+      />
+      <div
+        style={{
+          position: "fixed",
+          bottom: 0,
+          left: drawerStyle.left ?? 0,
+          width: drawerStyle.width ?? "100%",
+          zIndex: 301,
+          background: C.base,
+          borderTop: `1px solid ${C.border}`,
+          borderLeft: drawerStyle.width != null ? `1px solid ${C.border}` : undefined,
+          borderRight: drawerStyle.width != null ? `1px solid ${C.border}` : undefined,
+          borderRadius: `${R.xl}px ${R.xl}px 0 0`,
+          boxShadow: "0 -8px 40px rgba(0,0,0,0.1)",
+          maxHeight: "70vh",
+          display: "flex",
+          flexDirection: "column",
+          transform: visible ? "translateY(0)" : "translateY(100%)",
+          transition: "transform 0.28s cubic-bezier(0.32,0.72,0,1)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            padding: "14px 0 8px",
+          }}
+        >
+          <div
+            style={{
+              width: 32,
+              height: 3,
+              borderRadius: 2,
+              background: C.border,
+            }}
+          />
+        </div>
+        <div
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            padding: "20px 28px 0",
+          }}
+        >
+          <p style={{ ...T.label, marginBottom: 12 }}>Quote</p>
+          <textarea
+            ref={quoteRef}
+            value={quote}
+            onChange={(e) => setQuote(e.target.value)}
+            placeholder="Paste or type the quote…"
+            rows={4}
+            style={{
+              width: "100%",
+              fontSize: 15,
+              fontFamily: FONT_SERIF,
+              lineHeight: 1.85,
+              color: C.ink,
+              background: "transparent",
+              border: `1px solid ${C.border}`,
+              borderRadius: R.md,
+              outline: "none",
+              resize: "vertical",
+              padding: "12px 14px",
+              marginBottom: 20,
+            }}
+          />
+          <p style={{ ...T.label, marginBottom: 12 }}>Book</p>
+          <input
+            value={book}
+            onChange={(e) => setBook(e.target.value)}
+            placeholder="Book title"
+            style={{
+              width: "100%",
+              fontSize: 11,
+              fontWeight: 700,
+              color: C.secondary,
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+              fontFamily: FONT_SANS,
+              border: `1px solid ${C.border}`,
+              borderRadius: R.md,
+              outline: "none",
+              padding: "10px 14px",
+              marginBottom: 16,
+              background: "transparent",
+            }}
+          />
+          <p style={{ ...T.label, marginBottom: 12 }}>Author</p>
+          <input
+            value={author}
+            onChange={(e) => setAuthor(e.target.value)}
+            placeholder="Author"
+            style={{
+              width: "100%",
+              fontSize: 13,
+              color: C.muted,
+              fontFamily: FONT_SANS,
+              border: `1px solid ${C.border}`,
+              borderRadius: R.md,
+              outline: "none",
+              padding: "10px 14px",
+              marginBottom: 20,
+              background: "transparent",
+            }}
+          />
+        </div>
+        <div
+          style={{
+            padding: "14px 28px 24px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "flex-end",
+            gap: 8,
+            borderTop: `1px solid ${C.border}`,
+          }}
+        >
+          <Btn variant="ghost" size="sm" onClick={onClose}>
+            Cancel
+          </Btn>
+          <Btn variant="primary" size="sm" onClick={handleSave}>
+            <Check size={11} /> Save
+          </Btn>
+        </div>
+      </div>
+    </>
+  );
+});
+
 export const TagPickerDrawer = memo(function TagPickerDrawer({
   suggestedTags,
   quote,
@@ -1501,21 +1692,12 @@ export const NoteCard = memo(function NoteCard({
   const T = makeT(C);
   const [showAnnotation, setShowAnnotation] = useState(false);
   const [showTagPicker, setShowTagPicker] = useState(false);
+  const [showQuoteEdit, setShowQuoteEdit] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showCollPicker, setShowCollPicker] = useState(false);
-  const [editQuote, setEditQuote] = useState(card.quote);
-  const [editBook, setEditBook] = useState(card.book);
-  const [editAuthor, setEditAuthor] = useState(card.author ?? "");
-  const [isEditingQuote, setIsEditingQuote] = useState(false);
   const [pulse, setPulse] = useState(justSaved);
-  const quoteRef = useRef<HTMLTextAreaElement>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    setEditQuote(card.quote);
-    setEditBook(card.book);
-    setEditAuthor(card.author ?? "");
-  }, [card.quote, card.book, card.author]);
   useEffect(() => {
     if (justSaved) {
       setPulse(true);
@@ -1523,9 +1705,6 @@ export const NoteCard = memo(function NoteCard({
       return () => clearTimeout(t);
     }
   }, [justSaved]);
-  useEffect(() => {
-    if (isEditingQuote) quoteRef.current?.focus();
-  }, [isEditingQuote]);
   useEffect(() => {
     if (!showCollPicker) return;
     const h = (e: MouseEvent) => {
@@ -1552,17 +1731,21 @@ export const NoteCard = memo(function NoteCard({
   const warm = isWarm(card);
   const py = compact ? 16 : 22;
 
-  const commitField = () => {
-    if (!editQuote.trim() || !editBook.trim()) return;
-    onUpdate(card.id, {
-      quote: editQuote,
-      book: editBook,
-      author: editAuthor,
-    });
-  };
+  const openQuoteEdit = () => setShowQuoteEdit(true);
 
   return (
     <>
+      {showQuoteEdit && (
+        <QuoteEditDrawer
+          card={card}
+          onSave={(quote, book, author) => {
+            onUpdate(card.id, { quote, book, author });
+            setShowQuoteEdit(false);
+          }}
+          onClose={() => setShowQuoteEdit(false)}
+          inputContainerRef={inputContainerRef}
+        />
+      )}
       {showAnnotation && (
         <AnnotationDrawer
           card={card}
@@ -1682,54 +1865,24 @@ export const NoteCard = memo(function NoteCard({
         )}
 
         {!selectable ? (
-          isEditingQuote ? (
-            <textarea
-              ref={quoteRef}
-              value={editQuote}
-              onChange={(e) => setEditQuote(e.target.value)}
-              onBlur={() => {
-                setIsEditingQuote(false);
-                commitField();
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") {
-                  setIsEditingQuote(false);
-                  setEditQuote(card.quote);
-                }
-              }}
-              rows={3}
-              style={{
-                ...T.quoteMain,
-                width: "100%",
-                resize: "none",
-                outline: "none",
-                border: "none",
-                borderBottom: `1px solid ${C.ink}`,
-                background: "transparent",
-                marginBottom: 10,
-                paddingBottom: 4,
-              }}
-            />
-          ) : (
-            <p
-              onClick={() => setIsEditingQuote(true)}
-              style={{
-                ...T.quoteMain,
-                marginBottom: 10,
-                cursor: "text",
-                borderBottom: "1px dashed transparent",
-                transition: "border-color 0.15s",
-              }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.borderBottomColor = C.border)
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.borderBottomColor = "transparent")
-              }
-            >
-              "{card.quote}"
-            </p>
-          )
+          <p
+            onClick={openQuoteEdit}
+            style={{
+              ...T.quoteMain,
+              marginBottom: 10,
+              cursor: "text",
+              borderBottom: "1px dashed transparent",
+              transition: "border-color 0.15s",
+            }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.borderBottomColor = C.border)
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.borderBottomColor = "transparent")
+            }
+          >
+            "{card.quote}"
+          </p>
         ) : (
           <p style={{ ...T.quoteMain, marginBottom: 10, paddingRight: 28 }}>
             "{card.quote}"
@@ -1747,29 +1900,40 @@ export const NoteCard = memo(function NoteCard({
         >
           {!selectable ? (
             <>
-              <InlineEditField
-                value={editBook}
-                onChange={setEditBook}
-                onCommit={commitField}
-                placeholder="Book"
-                textStyle={T.book}
-                inputStyle={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: C.secondary,
-                  width: 160,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
+              <span
+                onClick={openQuoteEdit}
+                style={{
+                  ...T.book,
+                  cursor: "text",
+                  borderBottom: "1px dashed transparent",
+                  transition: "border-color 0.15s",
                 }}
-              />
-              <InlineEditField
-                value={editAuthor}
-                onChange={setEditAuthor}
-                onCommit={commitField}
-                placeholder="Author"
-                textStyle={T.author}
-                inputStyle={{ fontSize: 13, color: C.muted, width: 140 }}
-              />
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.borderBottomColor = C.border)
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.borderBottomColor = "transparent")
+                }
+              >
+                {card.book || "Book"}
+              </span>
+              <span
+                onClick={openQuoteEdit}
+                style={{
+                  ...T.author,
+                  cursor: "text",
+                  borderBottom: "1px dashed transparent",
+                  transition: "border-color 0.15s",
+                }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.borderBottomColor = C.border)
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.borderBottomColor = "transparent")
+                }
+              >
+                {card.author || "Author"}
+              </span>
               {card.year && <span style={T.meta}>{fmtYear(card.year)}</span>}
               {bookCount > 0 && (
                 <span
