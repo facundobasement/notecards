@@ -769,6 +769,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const inputContainerRef = useRef<HTMLDivElement | null>(null);
+  const welcomeDigestTriggeredRef = useRef(false);
 
   useEffect(() => {
     cardsRef.current = cards;
@@ -817,6 +818,54 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
     }
     load();
   }, [userId]);
+
+  // Welcome-back digest: once when user has cards but no messages (e.g. returning login)
+  useEffect(() => {
+    if (cardsLoading || cards.length === 0 || messages.length > 0 || welcomeDigestTriggeredRef.current) return;
+    welcomeDigestTriggeredRef.current = true;
+
+    const runWelcomeDigest = async () => {
+      const count = cards.length;
+      setMessages((p) => [
+        ...p,
+        mkMsg("assistant", {
+          type: "text",
+          text: `Welcome back — your library has ${count} card${count !== 1 ? "s" : ""}. Here's what's worth reading today:`,
+        }),
+      ]);
+      setLoading(true);
+      setLL("curating today's cards…");
+      const ctrl = new AbortController();
+      try {
+        const result = await generateDigest(cards, ctrl.signal);
+        if (result?.cards?.length) {
+          result.cards.forEach((c: { id: string }) => {
+            dispatch({ type: "SEEN", id: c.id });
+            void supabase
+              .from("notecards")
+              .update({ last_seen_at: new Date().toISOString() })
+              .eq("id", c.id)
+              .eq("user_id", userId);
+          });
+          setMessages((p) => [...p, mkMsg("assistant", { type: "digest", framing: result.framing, cards: result.cards })]);
+        } else {
+          setMessages((p) => [
+            ...p,
+            mkMsg("assistant", { type: "text", text: "Type / to see what you can do." }),
+          ]);
+        }
+      } catch {
+        setMessages((p) => [
+          ...p,
+          mkMsg("assistant", { type: "text", text: "Type / to see what you can do." }),
+        ]);
+      } finally {
+        setLoading(false);
+        setLL("");
+      }
+    };
+    runWelcomeDigest();
+  }, [cardsLoading, cards.length, messages.length, userId]);
 
   // Persist collections, themes, dark to localStorage when storageLoaded
   useEffect(() => {
