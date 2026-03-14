@@ -863,13 +863,14 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
     [userId]
   );
   const deleteCard = useCallback(
-    (id: string) => {
+    async (id: string) => {
       dispatch({ type: "DELETE", id });
-      void supabase
+      const { error } = await supabase
         .from("notecards")
         .delete()
         .eq("id", id)
         .eq("user_id", userId);
+      if (error) console.error("Supabase delete error:", error);
     },
     [userId]
   );
