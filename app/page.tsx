@@ -4,6 +4,9 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
+const FONT_SERIF = "'Playfair Display', Georgia, serif";
+const FONT_SANS = "'DM Sans', 'Inter', system-ui, sans-serif";
+
 export default function Home() {
   const router = useRouter();
 
@@ -16,34 +19,104 @@ export default function Home() {
   }, [router]);
 
   const handleLogin = async () => {
-    const origin = window.location.origin;
     await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: {
-        redirectTo: `${origin}/auth/callback`,
-      },
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
     });
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex w-full max-w-md flex-col items-center gap-6 rounded-2xl bg-white px-8 py-10 shadow-lg dark:bg-zinc-900">
-        <h1 className="text-2xl font-semibold tracking-tight text-black dark:text-zinc-50">
-          Notecards
-        </h1>
-        <p className="text-center text-sm text-zinc-600 dark:text-zinc-400">
-          Save quotes from the books you read and explore them with an AI
-          reading companion.
-        </p>
-        <button
-          onClick={handleLogin}
-          className="mt-2 flex w-full items-center justify-center gap-3 rounded-full bg-black px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=DM+Sans:wght@400;500&display=swap');
+      `}</style>
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#f7f6f3",
+          fontFamily: FONT_SANS,
+        }}
+      >
+        <main
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            textAlign: "center",
+            maxWidth: 360,
+            padding: "0 24px",
+          }}
         >
-          <span className="text-lg">G</span>
-          <span>Continue with Google</span>
-        </button>
-      </main>
-    </div>
+          <div
+            style={{
+              width: 20,
+              height: 1,
+              background: "#e2e1de",
+              marginBottom: 32,
+            }}
+          />
+          <h1
+            style={{
+              fontSize: 28,
+              fontFamily: FONT_SERIF,
+              color: "#0f0f0d",
+              fontWeight: 600,
+              marginBottom: 16,
+              letterSpacing: "-0.01em",
+            }}
+          >
+            Notecards
+          </h1>
+          <p
+            style={{
+              fontSize: 15,
+              color: "#787874",
+              lineHeight: 1.6,
+              maxWidth: 320,
+              marginBottom: 28,
+            }}
+          >
+            Save quotes from the books you read and explore them with an AI
+            reading companion.
+          </p>
+          <button
+            type="button"
+            onClick={handleLogin}
+            style={{
+              background: "#0f0f0d",
+              color: "#f7f6f3",
+              padding: "10px 24px",
+              borderRadius: 99,
+              fontSize: 13,
+              fontFamily: FONT_SANS,
+              fontWeight: 500,
+              border: "none",
+              cursor: "pointer",
+              transition: "background 0.15s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "#3a3a38";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "#0f0f0d";
+            }}
+          >
+            Continue with Google
+          </button>
+          <p
+            style={{
+              fontSize: 12,
+              color: "#b0afa9",
+              marginTop: 20,
+            }}
+          >
+            Your library is private and only visible to you.
+          </p>
+        </main>
+      </div>
+    </>
   );
 }
-
