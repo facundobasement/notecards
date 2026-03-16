@@ -2090,11 +2090,15 @@ export const NoteCard = memo(function NoteCard({
                 textTransform: "inherit",
                 letterSpacing: "inherit",
                 color: "inherit",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
               }}
               onMouseEnter={(e) => (e.currentTarget.style.color = C.ink)}
               onMouseLeave={(e) => (e.currentTarget.style.color = C.faint)}
             >
-              Annotate
+              <Pencil size={10} />
+              <span>✎ Annotate</span>
             </button>
             <span>·</span>
             <button
@@ -2113,11 +2117,15 @@ export const NoteCard = memo(function NoteCard({
                 textTransform: "inherit",
                 letterSpacing: "inherit",
                 color: "inherit",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
               }}
               onMouseEnter={(e) => (e.currentTarget.style.color = C.ink)}
               onMouseLeave={(e) => (e.currentTarget.style.color = C.faint)}
             >
-              Collection
+              <FolderPlus size={10} />
+              <span>⊕ Add to Collection</span>
             </button>
             {onElaborate && (
               <>
@@ -2138,6 +2146,9 @@ export const NoteCard = memo(function NoteCard({
                     textTransform: "inherit",
                     letterSpacing: "inherit",
                     color: "inherit",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
                   }}
                   onMouseEnter={(e) =>
                     (e.currentTarget.style.color = C.ink)
@@ -2146,7 +2157,8 @@ export const NoteCard = memo(function NoteCard({
                     (e.currentTarget.style.color = C.faint)
                   }
                 >
-                  Elaborate
+                  <Sparkles size={10} />
+                  <span>✦ Elaborate</span>
                 </button>
               </>
             )}
