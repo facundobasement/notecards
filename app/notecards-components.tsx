@@ -1677,6 +1677,7 @@ export const NoteCard = memo(function NoteCard({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showCollPicker, setShowCollPicker] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [hovered, setHovered] = useState(false);
   const [pulse, setPulse] = useState(justSaved);
   const pickerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -1763,16 +1764,27 @@ export const NoteCard = memo(function NoteCard({
         />
       )}
       <div
-        style={{
-          padding: `${py}px 0`,
-          borderBottom: `1px solid ${C.border}`,
-          position: "relative",
-          background: pulse ? C.savedPulse : "transparent",
-          transition: "background 0.6s ease",
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => {
+          setHovered(false);
+          setShowMenu(false);
         }}
-        className="nc-card"
-        onClick={selectable ? () => onSelect?.(card.id) : undefined}
       >
+        <div
+          style={{
+            padding: `${py}px 0`,
+            borderBottom: `1px solid ${C.border}`,
+            position: "relative",
+            background: pulse
+              ? C.savedPulse
+              : hovered
+              ? C.surface
+              : "transparent",
+            transition: "background 0.15s ease",
+          }}
+          className="nc-card"
+          onClick={selectable ? () => onSelect?.(card.id) : undefined}
+        >
         {!selectable && (
           <div
             title={warm ? "Seen recently" : "Haven't visited in a while"}
@@ -1784,109 +1796,9 @@ export const NoteCard = memo(function NoteCard({
               height: 4,
               borderRadius: "50%",
               background: warm ? C.warmDot : C.coldDot,
-              opacity: 0.5,
+              opacity: 0.4,
             }}
           />
-        )}
-        {!selectable && (
-          <div
-            style={{
-              position: "absolute",
-              top: py,
-              right: 0,
-            }}
-            ref={menuRef}
-          >
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowMenu((v) => !v);
-              }}
-              style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                color: C.faint,
-                padding: 4,
-                fontSize: 14,
-                letterSpacing: "0.1em",
-                opacity: 0.4,
-                transition: "opacity 0.15s, color 0.15s",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.opacity = "1";
-                e.currentTarget.style.color = C.ink;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.opacity = "0.4";
-                e.currentTarget.style.color = C.faint;
-              }}
-            >
-              •••
-            </button>
-            {showMenu && (
-              <div
-                style={{
-                  position: "absolute",
-                  top: py + 24,
-                  right: 0,
-                  background: C.base,
-                  border: `1px solid ${C.border}`,
-                  borderRadius: R.lg,
-                  boxShadow: "0 8px 32px rgba(0,0,0,0.1)",
-                  minWidth: 160,
-                  zIndex: 10,
-                }}
-              >
-                {onElaborate && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowMenu(false);
-                      onElaborate(card);
-                    }}
-                    style={{
-                      width: "100%",
-                      textAlign: "left",
-                      padding: "10px 16px",
-                      background: "transparent",
-                      border: "none",
-                      cursor: "pointer",
-                      fontSize: 13,
-                      fontFamily: FONT_SANS,
-                      color: C.ink,
-                    }}
-                  >
-                    ✦ Elaborate
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowMenu(false);
-                    setConfirmDelete(true);
-                  }}
-                  style={{
-                    width: "100%",
-                    textAlign: "left",
-                    padding: "10px 16px",
-                    background: "transparent",
-                    border: "none",
-                    cursor: "pointer",
-                    fontSize: 13,
-                    fontFamily: FONT_SANS,
-                    color: C.danger,
-                    borderTop: `1px solid ${C.border}`,
-                  }}
-                >
-                  Delete card
-                </button>
-              </div>
-            )}
-          </div>
         )}
         {selectable && (
           <div
@@ -2038,64 +1950,23 @@ export const NoteCard = memo(function NoteCard({
           </div>
         )}
 
-        {!selectable && (
+        {!selectable && card.note && (
           <div style={{ marginTop: 12 }}>
-            {card.note ? (
-              <button
-                onClick={() => setShowAnnotation(true)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  padding: "2px 0",
-                  width: "100%",
-                  textAlign: "left",
-                }}
-              >
-                <p
-                  style={{
-                    fontSize: 14,
-                    fontFamily: FONT_SERIF,
-                    color: C.muted,
-                    lineHeight: 1.7,
-                    margin: 0,
-                    overflow: "hidden",
-                    display: "-webkit-box",
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: "vertical",
-                  } as React.CSSProperties}
-                >
-                  {card.note}
-                </p>
-              </button>
-            ) : (
-              <button
-                onClick={() => setShowAnnotation(true)}
-                style={{
-                  fontSize: 12,
-                  color: C.faint,
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  fontFamily: FONT_SANS,
-                  padding: "2px 0",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 4,
-                  transition: "color 0.15s",
-                  letterSpacing: "0.02em",
-                }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.color = C.muted)
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.color = C.faint)
-                }
-              >
-                <Pencil size={9} />
-                <span>annotate…</span>
-              </button>
-            )}
+            <p
+              style={{
+                fontSize: 14,
+                fontFamily: FONT_SERIF,
+                color: C.muted,
+                lineHeight: 1.7,
+                margin: 0,
+                overflow: "hidden",
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+              } as React.CSSProperties}
+            >
+              {card.note}
+            </p>
           </div>
         )}
 
@@ -2145,7 +2016,7 @@ export const NoteCard = memo(function NoteCard({
           </div>
         )}
 
-        {!selectable && (
+        {!selectable && cardColls.length > 0 && (
           <div
             style={{ marginTop: 10, position: "relative" }}
             ref={pickerRef}
@@ -2172,32 +2043,6 @@ export const NoteCard = memo(function NoteCard({
                   {col.name}
                 </Chip>
               ))}
-              <button
-                onClick={() => setShowCollPicker((v) => !v)}
-                style={{
-                  fontSize: 11,
-                  fontFamily: FONT_SANS,
-                  color: C.faint,
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  padding: "1px 3px",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 3,
-                  transition: "color 0.15s",
-                  letterSpacing: "0.02em",
-                }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.color = C.muted)
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.color = C.faint)
-                }
-              >
-                <FolderPlus size={9} />
-                {cardColls.length === 0 ? "add to collection" : "edit"}
-              </button>
             </div>
             {showCollPicker && (
               <CollectionPopover
@@ -2208,6 +2053,165 @@ export const NoteCard = memo(function NoteCard({
                 onClose={() => setShowCollPicker(false)}
               />
             )}
+          </div>
+        )}
+
+        {!selectable && (
+          <div
+            style={{
+              marginTop: 10,
+              paddingTop: 6,
+              borderTop: `1px solid ${C.border}`,
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              fontSize: 11,
+              fontFamily: FONT_SANS,
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+              color: C.faint,
+              opacity: hovered ? 1 : 0,
+              transition: "opacity 0.15s ease",
+            }}
+          >
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowAnnotation(true);
+              }}
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                padding: 0,
+                fontSize: "inherit",
+                fontFamily: "inherit",
+                textTransform: "inherit",
+                letterSpacing: "inherit",
+                color: "inherit",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = C.ink)}
+              onMouseLeave={(e) => (e.currentTarget.style.color = C.faint)}
+            >
+              Annotate
+            </button>
+            <span>·</span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowCollPicker(true);
+              }}
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                padding: 0,
+                fontSize: "inherit",
+                fontFamily: "inherit",
+                textTransform: "inherit",
+                letterSpacing: "inherit",
+                color: "inherit",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = C.ink)}
+              onMouseLeave={(e) => (e.currentTarget.style.color = C.faint)}
+            >
+              Collection
+            </button>
+            {onElaborate && (
+              <>
+                <span>·</span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onElaborate(card);
+                  }}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    padding: 0,
+                    fontSize: "inherit",
+                    fontFamily: "inherit",
+                    textTransform: "inherit",
+                    letterSpacing: "inherit",
+                    color: "inherit",
+                  }}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.color = C.ink)
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.color = C.faint)
+                  }
+                >
+                  Elaborate
+                </button>
+              </>
+            )}
+            <span>·</span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowMenu((v) => !v);
+              }}
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                padding: 0,
+                fontSize: "inherit",
+                fontFamily: "inherit",
+                textTransform: "inherit",
+                letterSpacing: "inherit",
+                color: "inherit",
+                position: "relative",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = C.ink)}
+              onMouseLeave={(e) => (e.currentTarget.style.color = C.faint)}
+            >
+              ···
+              {showMenu && (
+                <div
+                  ref={menuRef}
+                  style={{
+                    position: "absolute",
+                    top: 18,
+                    right: 0,
+                    background: C.base,
+                    border: `1px solid ${C.border}`,
+                    borderRadius: R.lg,
+                    boxShadow: "0 8px 32px rgba(0,0,0,0.1)",
+                    minWidth: 140,
+                    zIndex: 10,
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowMenu(false);
+                      setConfirmDelete(true);
+                    }}
+                    style={{
+                      width: "100%",
+                      textAlign: "left",
+                      padding: "10px 16px",
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: 13,
+                      fontFamily: FONT_SANS,
+                      color: C.danger,
+                    }}
+                  >
+                    Delete card
+                  </button>
+                </div>
+              )}
+            </button>
           </div>
         )}
       </div>
