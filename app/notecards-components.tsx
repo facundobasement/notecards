@@ -23,6 +23,9 @@ import {
   Zap,
   FileText,
   FolderPlus,
+  MoreHorizontal,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -574,377 +577,6 @@ export function useKey(
   }, deps);
 }
 
-export const AnnotationDrawer = memo(function AnnotationDrawer({
-  card,
-  onSave,
-  onClose,
-  inputContainerRef,
-}: {
-  card: CardLike;
-  onSave: (note: string) => void;
-  onClose: () => void;
-  inputContainerRef?: React.RefObject<HTMLDivElement | null>;
-}) {
-  const C = useC();
-  const T = makeT(C);
-  const [text, setText] = useState(card.note ?? "");
-  const [visible, setVisible] = useState(false);
-  const [drawerStyle, setDrawerStyle] = useState<{ left: number; width?: number }>({
-    left: 0,
-    width: undefined,
-  });
-  const taRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    if (inputContainerRef?.current) {
-      const rect = inputContainerRef.current.getBoundingClientRect();
-      setDrawerStyle({ left: rect.left, width: rect.width });
-    }
-    const t = requestAnimationFrame(() => setVisible(true));
-    return () => cancelAnimationFrame(t);
-  }, [inputContainerRef]);
-
-  useEffect(() => {
-    const t = setTimeout(() => taRef.current?.focus(), 120);
-    return () => clearTimeout(t);
-  }, []);
-  useKey(
-    "Escape",
-    () => {
-      onSave(text.trim());
-      onClose();
-    },
-    [text, onSave, onClose]
-  );
-  const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
-  const handleClose = () => {
-    onSave(text.trim());
-    onClose();
-  };
-  return (
-    <>
-      <div
-        onClick={handleClose}
-        style={{
-          position: "fixed",
-          inset: 0,
-          zIndex: 300,
-          background: "rgba(0,0,0,0.15)",
-          opacity: visible ? 1 : 0,
-          transition: "opacity 0.2s ease",
-        }}
-      />
-      <div
-        style={{
-          position: "fixed",
-          bottom: 0,
-          left: drawerStyle.left ?? 0,
-          width: drawerStyle.width ?? "100%",
-          zIndex: 301,
-          background: C.base,
-          borderTop: `1px solid ${C.border}`,
-          borderLeft: drawerStyle.width != null ? `1px solid ${C.border}` : undefined,
-          borderRight: drawerStyle.width != null ? `1px solid ${C.border}` : undefined,
-          borderRadius: `${R.xl}px ${R.xl}px 0 0`,
-          boxShadow: "0 -8px 40px rgba(0,0,0,0.1)",
-          maxHeight: "70vh",
-          display: "flex",
-          flexDirection: "column",
-          transform: visible ? "translateY(0)" : "translateY(100%)",
-          transition: "transform 0.28s cubic-bezier(0.32,0.72,0,1)",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            padding: "14px 0 8px",
-          }}
-        >
-          <div
-            style={{
-              width: 32,
-              height: 3,
-              borderRadius: 2,
-              background: C.border,
-            }}
-          />
-        </div>
-        <div
-          style={{
-            padding: "4px 28px 18px",
-            borderBottom: `1px solid ${C.border}`,
-          }}
-        >
-          <p
-            style={{
-              ...T.quoteMain,
-              fontSize: 13,
-              color: C.muted,
-              marginBottom: 6,
-            }}
-          >
-            "{card.quote.length > 120 ? card.quote.slice(0, 120) + "…" : card.quote}"
-          </p>
-          <span style={T.book}>{card.book}</span>
-          {card.author && (
-            <span style={{ ...T.author, marginLeft: 8 }}>{card.author}</span>
-          )}
-        </div>
-        <div
-          style={{
-            flex: 1,
-            overflowY: "auto",
-            padding: "20px 28px 0",
-          }}
-        >
-          <p style={{ ...T.label, marginBottom: 12 }}>Your annotation</p>
-          <textarea
-            ref={taRef}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="What does this quote mean to you? Where does it push back against something you believe?"
-            style={{
-              width: "100%",
-              minHeight: 120,
-              fontSize: 15,
-              fontFamily: FONT_SERIF,
-              lineHeight: 1.85,
-              color: C.ink,
-              background: "transparent",
-              border: "none",
-              outline: "none",
-              resize: "none",
-              padding: 0,
-            }}
-          />
-        </div>
-        <div
-          style={{
-            padding: "14px 28px 24px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <span style={T.caption}>
-            {wordCount > 0
-              ? `${wordCount} words`
-              : "ESC or tap outside to save & close"}
-          </span>
-          <div style={{ display: "flex", gap: 8 }}>
-            {card.note && (
-              <Btn
-                variant="danger"
-                size="sm"
-                onClick={() => {
-                  onSave("");
-                  onClose();
-                }}
-              >
-                Remove
-              </Btn>
-            )}
-            <Btn variant="primary" size="sm" onClick={handleClose}>
-              <Check size={11} /> Done
-            </Btn>
-          </div>
-        </div>
-      </div>
-    </>
-  );
-});
-
-export const QuoteEditDrawer = memo(function QuoteEditDrawer({
-  card,
-  onSave,
-  onClose,
-  inputContainerRef,
-}: {
-  card: CardLike;
-  onSave: (quote: string, book: string, author: string) => void;
-  onClose: () => void;
-  inputContainerRef?: React.RefObject<HTMLDivElement | null>;
-}) {
-  const C = useC();
-  const T = makeT(C);
-  const [quote, setQuote] = useState(card.quote);
-  const [book, setBook] = useState(card.book);
-  const [author, setAuthor] = useState(card.author ?? "");
-  const [visible, setVisible] = useState(false);
-  const [drawerStyle, setDrawerStyle] = useState<{ left: number; width?: number }>({
-    left: 0,
-    width: undefined,
-  });
-  const quoteRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    if (inputContainerRef?.current) {
-      const rect = inputContainerRef.current.getBoundingClientRect();
-      setDrawerStyle({ left: rect.left, width: rect.width });
-    }
-    const t = requestAnimationFrame(() => setVisible(true));
-    return () => cancelAnimationFrame(t);
-  }, [inputContainerRef]);
-
-  useEffect(() => {
-    setQuote(card.quote);
-    setBook(card.book);
-    setAuthor(card.author ?? "");
-  }, [card.quote, card.book, card.author]);
-
-  useEffect(() => {
-    const t = setTimeout(() => quoteRef.current?.focus(), 120);
-    return () => clearTimeout(t);
-  }, []);
-
-  useKey("Escape", onClose, [onClose]);
-
-  const handleSave = () => {
-    if (!quote.trim() || !book.trim()) return;
-    onSave(quote.trim(), book.trim(), author.trim());
-    onClose();
-  };
-
-  return (
-    <>
-      <div
-        onClick={onClose}
-        style={{
-          position: "fixed",
-          inset: 0,
-          zIndex: 300,
-          background: "rgba(0,0,0,0.15)",
-          opacity: visible ? 1 : 0,
-          transition: "opacity 0.2s ease",
-        }}
-      />
-      <div
-        style={{
-          position: "fixed",
-          bottom: 0,
-          left: drawerStyle.left ?? 0,
-          width: drawerStyle.width ?? "100%",
-          zIndex: 301,
-          background: C.base,
-          borderTop: `1px solid ${C.border}`,
-          borderLeft: drawerStyle.width != null ? `1px solid ${C.border}` : undefined,
-          borderRight: drawerStyle.width != null ? `1px solid ${C.border}` : undefined,
-          borderRadius: `${R.xl}px ${R.xl}px 0 0`,
-          boxShadow: "0 -8px 40px rgba(0,0,0,0.1)",
-          maxHeight: "70vh",
-          display: "flex",
-          flexDirection: "column",
-          transform: visible ? "translateY(0)" : "translateY(100%)",
-          transition: "transform 0.28s cubic-bezier(0.32,0.72,0,1)",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            padding: "14px 0 8px",
-          }}
-        >
-          <div
-            style={{
-              width: 32,
-              height: 3,
-              borderRadius: 2,
-              background: C.border,
-            }}
-          />
-        </div>
-        <div
-          style={{
-            flex: 1,
-            overflowY: "auto",
-            padding: "20px 28px 0",
-          }}
-        >
-          <p style={{ ...T.label, marginBottom: 12 }}>Quote</p>
-          <textarea
-            ref={quoteRef}
-            value={quote}
-            onChange={(e) => setQuote(e.target.value)}
-            placeholder="Paste or type the quote…"
-            rows={4}
-            style={{
-              width: "100%",
-              fontSize: 15,
-              fontFamily: FONT_SERIF,
-              lineHeight: 1.85,
-              color: C.ink,
-              background: "transparent",
-              border: `1px solid ${C.border}`,
-              borderRadius: R.md,
-              outline: "none",
-              resize: "vertical",
-              padding: "12px 14px",
-              marginBottom: 20,
-            }}
-          />
-          <p style={{ ...T.label, marginBottom: 12 }}>Book</p>
-          <input
-            value={book}
-            onChange={(e) => setBook(e.target.value)}
-            placeholder="Book title"
-            style={{
-              width: "100%",
-              fontSize: 11,
-              fontWeight: 700,
-              color: C.secondary,
-              textTransform: "uppercase",
-              letterSpacing: "0.05em",
-              fontFamily: FONT_SANS,
-              border: `1px solid ${C.border}`,
-              borderRadius: R.md,
-              outline: "none",
-              padding: "10px 14px",
-              marginBottom: 16,
-              background: "transparent",
-            }}
-          />
-          <p style={{ ...T.label, marginBottom: 12 }}>Author</p>
-          <input
-            value={author}
-            onChange={(e) => setAuthor(e.target.value)}
-            placeholder="Author"
-            style={{
-              width: "100%",
-              fontSize: 13,
-              color: C.muted,
-              fontFamily: FONT_SANS,
-              border: `1px solid ${C.border}`,
-              borderRadius: R.md,
-              outline: "none",
-              padding: "10px 14px",
-              marginBottom: 20,
-              background: "transparent",
-            }}
-          />
-        </div>
-        <div
-          style={{
-            padding: "14px 28px 24px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "flex-end",
-            gap: 8,
-            borderTop: `1px solid ${C.border}`,
-          }}
-        >
-          <Btn variant="ghost" size="sm" onClick={onClose}>
-            Cancel
-          </Btn>
-          <Btn variant="primary" size="sm" onClick={handleSave}>
-            <Check size={11} /> Save
-          </Btn>
-        </div>
-      </div>
-    </>
-  );
-});
 
 export const TagPickerDrawer = memo(function TagPickerDrawer({
   suggestedTags,
@@ -1425,219 +1057,482 @@ export const TagEditor = memo(function TagEditor({
 
 type Collection = { id: string; name: string; color: string; createdAt?: number };
 
-export const CollectionPopover = memo(function CollectionPopover({
-  card,
-  collections,
-  onSave,
-  onClose,
-  onCreateNew,
-}: {
+
+// ─── CardDetailDrawer ────────────────────────────────────────────────────────
+type CardDetailDrawerProps = {
   card: CardLike;
   collections: Collection[];
-  onSave: (ids: string[]) => void;
+  allCards?: CardLike[];
+  onUpdate: (id: string, patch: Partial<CardLike>) => void;
+  onTagsChange: (id: string, tags: string[]) => void;
+  onSetCollections: (id: string, ids: string[]) => void;
+  onCreateCollection: (col: Collection) => void;
   onClose: () => void;
-  onCreateNew: (col: Collection) => void;
-}) {
+  inputContainerRef?: React.RefObject<HTMLDivElement | null>;
+};
+
+const CardDetailDrawer = memo(function CardDetailDrawer({
+  card,
+  collections,
+  allCards,
+  onUpdate,
+  onTagsChange,
+  onSetCollections,
+  onCreateCollection,
+  onClose,
+  inputContainerRef,
+}: CardDetailDrawerProps) {
   const C = useC();
   const T = makeT(C);
-  const [local, setLocal] = useState(new Set(card.collectionIds ?? []));
-  const [creating, setCreating] = useState(false);
-  const [newName, setNewName] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [visible, setVisible] = useState(false);
+  const [drawerStyle, setDrawerStyle] = useState<{ left: number; width?: number }>({ left: 0, width: undefined });
+
+  // Quote fields
+  const [quote, setQuote] = useState(card.quote);
+  const [book, setBook] = useState(card.book);
+  const [author, setAuthor] = useState(card.author ?? "");
+  // Annotation
+  const [note, setNote] = useState(card.note ?? "");
+  // Tags
+  const [selectedTags, setSelectedTags] = useState<string[]>(card.tags ?? []);
+  const [tagInput, setTagInput] = useState("");
+  // Collections
+  const [selectedColIds, setSelectedColIds] = useState<Set<string>>(new Set(card.collectionIds ?? []));
+  const [creatingCol, setCreatingCol] = useState(false);
+  const [newColName, setNewColName] = useState("");
+  // Sections
+  const [expandedSection, setExpandedSection] = useState<string>("quote");
+
+  const quoteRef = useRef<HTMLTextAreaElement>(null);
+  const tagInputRef = useRef<HTMLInputElement>(null);
+  const colInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
-    if (creating) inputRef.current?.focus();
-  }, [creating]);
-  const toggle = (id: string) =>
-    setLocal((s) => {
+    if (inputContainerRef?.current) {
+      const rect = inputContainerRef.current.getBoundingClientRect();
+      setDrawerStyle({ left: rect.left, width: rect.width });
+    }
+    const t = requestAnimationFrame(() => setVisible(true));
+    return () => cancelAnimationFrame(t);
+  }, [inputContainerRef]);
+
+  useEffect(() => {
+    const t = setTimeout(() => quoteRef.current?.focus(), 120);
+    return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    if (creatingCol) colInputRef.current?.focus();
+  }, [creatingCol]);
+
+  useKey("Escape", onClose, [onClose]);
+
+  const wordCount = note.trim() ? note.trim().split(/\s+/).length : 0;
+
+  const allTags = useMemo(() => {
+    const s = new Set<string>();
+    allCards?.forEach((c) => c.tags?.forEach((t) => s.add(t)));
+    return [...s].filter((t) => !selectedTags.includes(t)).slice(0, 12);
+  }, [allCards, selectedTags]);
+
+  const toggleTag = (t: string) =>
+    setSelectedTags((p) => (p.includes(t) ? p.filter((x) => x !== t) : [...p, t]));
+  const addTag = () => {
+    const c = cleanTag(tagInput);
+    if (c && !selectedTags.includes(c)) setSelectedTags((p) => [...p, c]);
+    setTagInput("");
+    tagInputRef.current?.focus();
+  };
+  const toggleCol = (id: string) =>
+    setSelectedColIds((s) => {
       const n = new Set(s);
       n.has(id) ? n.delete(id) : n.add(id);
       return n;
     });
-  const submit = () => {
-    const n = newName.trim();
+  const createCol = () => {
+    const n = newColName.trim();
     if (!n) return;
     const col: Collection = {
       id: uid(),
       name: n,
-      color:
-        COLLECTION_COLORS[
-          Math.floor(Math.random() * COLLECTION_COLORS.length)
-        ] ?? COLLECTION_COLORS[0],
+      color: COLLECTION_COLORS[Math.floor(Math.random() * COLLECTION_COLORS.length)] ?? COLLECTION_COLORS[0],
       createdAt: NOW(),
     };
-    onCreateNew(col);
-    setLocal((s) => new Set([...s, col.id]));
-    setNewName("");
-    setCreating(false);
+    onCreateCollection(col);
+    setSelectedColIds((s) => new Set([...s, col.id]));
+    setNewColName("");
+    setCreatingCol(false);
   };
-  return (
-    <div
+
+  const handleSave = () => {
+    const patch: Partial<CardLike> = {};
+    if (quote.trim() !== card.quote) patch.quote = quote.trim();
+    if (book.trim() !== card.book) patch.book = book.trim();
+    if ((author.trim() || "") !== (card.author ?? "")) patch.author = author.trim();
+    if (note.trim() !== (card.note ?? "")) patch.note = note.trim();
+    if (!quote.trim() || !book.trim()) return;
+    if (Object.keys(patch).length) onUpdate(card.id, patch);
+    const origTags = card.tags ?? [];
+    if (JSON.stringify(selectedTags) !== JSON.stringify(origTags)) onTagsChange(card.id, selectedTags);
+    const origCols = card.collectionIds ?? [];
+    const newCols = [...selectedColIds];
+    if (JSON.stringify(newCols.sort()) !== JSON.stringify([...origCols].sort())) onSetCollections(card.id, newCols);
+    onClose();
+  };
+
+  const toggle = (section: string) =>
+    setExpandedSection((p) => (p === section ? "" : section));
+
+  const sectionHeader = (id: string, label: string, summary?: string) => (
+    <button
+      type="button"
+      onClick={() => toggle(id)}
       style={{
-        position: "absolute",
-        top: "calc(100% + 6px)",
-        left: 0,
-        zIndex: 90,
-        background: C.base,
-        border: `1px solid ${C.border}`,
-        borderRadius: R.lg,
-        boxShadow: "0 8px 32px rgba(0,0,0,0.1)",
-        minWidth: 220,
-        overflow: "hidden",
-        animation: "fadeIn 0.12s ease",
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "12px 0",
+        background: "none",
+        border: "none",
+        cursor: "pointer",
+        fontFamily: FONT_SANS,
       }}
     >
+      <span style={{ ...T.label, margin: 0 }}>{label}</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        {summary && expandedSection !== id && (
+          <span style={{ ...T.caption, maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{summary}</span>
+        )}
+        {expandedSection === id ? <ChevronUp size={12} color={C.faint} /> : <ChevronDown size={12} color={C.faint} />}
+      </div>
+    </button>
+  );
+
+  return (
+    <>
+      <div
+        onClick={onClose}
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 300,
+          background: "rgba(0,0,0,0.15)",
+          opacity: visible ? 1 : 0,
+          transition: "opacity 0.2s ease",
+        }}
+      />
       <div
         style={{
-          padding: "8px 14px",
-          borderBottom: `1px solid ${C.border}`,
+          position: "fixed",
+          bottom: 0,
+          left: drawerStyle.left ?? 0,
+          width: drawerStyle.width ?? "100%",
+          zIndex: 301,
+          background: C.base,
+          borderTop: `1px solid ${C.border}`,
+          borderLeft: drawerStyle.width != null ? `1px solid ${C.border}` : undefined,
+          borderRight: drawerStyle.width != null ? `1px solid ${C.border}` : undefined,
+          borderRadius: `${R.xl}px ${R.xl}px 0 0`,
+          boxShadow: "0 -8px 40px rgba(0,0,0,0.1)",
+          maxHeight: "80vh",
+          display: "flex",
+          flexDirection: "column",
+          transform: visible ? "translateY(0)" : "translateY(100%)",
+          transition: "transform 0.28s cubic-bezier(0.32,0.72,0,1)",
         }}
       >
-        <span style={T.label}>Add to collection</span>
-      </div>
-      {collections.length === 0 && !creating && (
-        <p style={{ ...T.caption, padding: "12px 14px" }}>
-          No collections yet.
-        </p>
-      )}
-      {collections.map((col) => {
-        const on = local.has(col.id);
-        return (
-          <button
-            key={col.id}
-            onClick={() => toggle(col.id)}
-            style={{
-              width: "100%",
-              textAlign: "left",
-              padding: "10px 14px",
-              background: on ? C.surface : "transparent",
-              border: "none",
-              cursor: "pointer",
-              fontFamily: FONT_SANS,
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              transition: "background 0.1s",
-            }}
-            onMouseEnter={(e) => {
-              if (!on) e.currentTarget.style.background = C.surface;
-            }}
-            onMouseLeave={(e) => {
-              if (!on) e.currentTarget.style.background = "transparent";
-            }}
-          >
-            <span
-              style={{
-                width: 7,
-                height: 7,
-                borderRadius: "50%",
-                background: col.color,
-                flexShrink: 0,
-              }}
-            />
-            <span style={{ fontSize: 13, color: C.ink, flex: 1 }}>
-              {col.name}
-            </span>
-            {on && <Check size={12} color={C.ink} />}
-          </button>
-        );
-      })}
-      {creating ? (
+        {/* Drag handle */}
+        <div style={{ display: "flex", justifyContent: "center", padding: "14px 0 8px" }}>
+          <div style={{ width: 32, height: 3, borderRadius: 2, background: C.border }} />
+        </div>
+
+        {/* Scrollable content */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "0 28px" }}>
+          {/* ── Quote section ── */}
+          {sectionHeader("quote", "Quote", card.quote.length > 40 ? card.quote.slice(0, 40) + "…" : card.quote)}
+          {expandedSection === "quote" && (
+            <div style={{ paddingBottom: 16 }}>
+              <textarea
+                ref={quoteRef}
+                value={quote}
+                onChange={(e) => setQuote(e.target.value)}
+                placeholder="Paste or type the quote…"
+                rows={4}
+                style={{
+                  width: "100%",
+                  fontSize: 15,
+                  fontFamily: FONT_SERIF,
+                  lineHeight: 1.85,
+                  color: C.ink,
+                  background: "transparent",
+                  border: `1px solid ${C.border}`,
+                  borderRadius: R.md,
+                  outline: "none",
+                  resize: "vertical",
+                  padding: "12px 14px",
+                  marginBottom: 14,
+                }}
+              />
+              <div style={{ display: "flex", gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <p style={{ ...T.label, marginBottom: 6 }}>Book</p>
+                  <input
+                    value={book}
+                    onChange={(e) => setBook(e.target.value)}
+                    placeholder="Book title"
+                    style={{
+                      width: "100%",
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: C.secondary,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      fontFamily: FONT_SANS,
+                      border: `1px solid ${C.border}`,
+                      borderRadius: R.md,
+                      outline: "none",
+                      padding: "10px 14px",
+                      background: "transparent",
+                    }}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <p style={{ ...T.label, marginBottom: 6 }}>Author</p>
+                  <input
+                    value={author}
+                    onChange={(e) => setAuthor(e.target.value)}
+                    placeholder="Author"
+                    style={{
+                      width: "100%",
+                      fontSize: 13,
+                      color: C.muted,
+                      fontFamily: FONT_SANS,
+                      border: `1px solid ${C.border}`,
+                      borderRadius: R.md,
+                      outline: "none",
+                      padding: "10px 14px",
+                      background: "transparent",
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+          <div style={{ height: 1, background: C.border, opacity: 0.6 }} />
+
+          {/* ── Annotation section ── */}
+          {sectionHeader("annotation", "Annotation", note ? `${wordCount} words` : undefined)}
+          {expandedSection === "annotation" && (
+            <div style={{ paddingBottom: 16 }}>
+              <textarea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="What does this quote mean to you?"
+                style={{
+                  width: "100%",
+                  minHeight: 100,
+                  fontSize: 15,
+                  fontFamily: FONT_SERIF,
+                  lineHeight: 1.85,
+                  color: C.ink,
+                  background: "transparent",
+                  border: "none",
+                  outline: "none",
+                  resize: "none",
+                  padding: 0,
+                }}
+              />
+              {wordCount > 0 && <span style={T.caption}>{wordCount} words</span>}
+            </div>
+          )}
+          <div style={{ height: 1, background: C.border, opacity: 0.6 }} />
+
+          {/* ── Tags section ── */}
+          {sectionHeader("tags", "Tags", selectedTags.length ? selectedTags.join(", ") : undefined)}
+          {expandedSection === "tags" && (
+            <div style={{ paddingBottom: 16 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+                {selectedTags.map((t) => (
+                  <Chip key={t} active onRemove={() => toggleTag(t)}>{t}</Chip>
+                ))}
+                {selectedTags.length === 0 && <span style={T.caption}>No tags yet</span>}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                <input
+                  ref={tagInputRef}
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if ((e.key === "Enter" || e.key === ",") && tagInput.trim()) {
+                      e.preventDefault();
+                      addTag();
+                    }
+                  }}
+                  placeholder="Type a tag and press Enter…"
+                  style={{
+                    flex: 1,
+                    border: "none",
+                    outline: "none",
+                    background: "transparent",
+                    fontSize: 13,
+                    fontFamily: FONT_SANS,
+                    color: C.ink,
+                    padding: "6px 0",
+                  }}
+                />
+                {tagInput.trim() && (
+                  <Btn variant="subtle" size="xs" onClick={addTag}><Plus size={10} /> Add</Btn>
+                )}
+              </div>
+              {allTags.length > 0 && (
+                <div>
+                  <p style={{ ...T.label, marginBottom: 8, opacity: 0.55 }}>Suggestions</p>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                    {allTags.map((t) => (
+                      <button
+                        key={t}
+                        onClick={() => setSelectedTags((p) => [...p, t])}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          padding: "3px 10px",
+                          borderRadius: R.pill,
+                          fontSize: 11,
+                          fontFamily: FONT_SANS,
+                          background: "transparent",
+                          color: C.muted,
+                          border: `1px dashed ${C.border}`,
+                          cursor: "pointer",
+                          transition: "all 0.15s",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = C.surface;
+                          e.currentTarget.style.borderStyle = "solid";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = "transparent";
+                          e.currentTarget.style.borderStyle = "dashed";
+                        }}
+                      >
+                        <Plus size={9} />{t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          <div style={{ height: 1, background: C.border, opacity: 0.6 }} />
+
+          {/* ── Collections section ── */}
+          {sectionHeader("collections", "Collections", [...selectedColIds].map((id) => collections.find((c) => c.id === id)?.name).filter(Boolean).join(", ") || undefined)}
+          {expandedSection === "collections" && (
+            <div style={{ paddingBottom: 16 }}>
+              {collections.length === 0 && !creatingCol && (
+                <p style={{ ...T.caption, marginBottom: 8 }}>No collections yet.</p>
+              )}
+              {collections.map((col) => {
+                const on = selectedColIds.has(col.id);
+                return (
+                  <button
+                    key={col.id}
+                    onClick={() => toggleCol(col.id)}
+                    style={{
+                      width: "100%",
+                      textAlign: "left",
+                      padding: "10px 0",
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      fontFamily: FONT_SANS,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      transition: "background 0.1s",
+                    }}
+                  >
+                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: col.color, flexShrink: 0 }} />
+                    <span style={{ fontSize: 13, color: C.ink, flex: 1 }}>{col.name}</span>
+                    {on && <Check size={12} color={C.ink} />}
+                  </button>
+                );
+              })}
+              {creatingCol ? (
+                <div style={{ paddingTop: 8 }}>
+                  <input
+                    ref={colInputRef}
+                    value={newColName}
+                    onChange={(e) => setNewColName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") createCol();
+                      if (e.key === "Escape") { setCreatingCol(false); setNewColName(""); }
+                    }}
+                    placeholder="Collection name…"
+                    style={{
+                      width: "100%",
+                      fontSize: 12,
+                      fontFamily: FONT_SANS,
+                      border: "none",
+                      borderBottom: `1px solid ${C.border}`,
+                      outline: "none",
+                      background: "transparent",
+                      color: C.ink,
+                      paddingBottom: 4,
+                      marginBottom: 8,
+                    }}
+                  />
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <Btn variant="primary" size="xs" onClick={createCol}><Check size={10} /> Create</Btn>
+                    <Btn variant="ghost" size="xs" onClick={() => { setCreatingCol(false); setNewColName(""); }}>Cancel</Btn>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setCreatingCol(true)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "10px 0",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    fontFamily: FONT_SANS,
+                    color: C.faint,
+                    fontSize: 12,
+                    transition: "color 0.15s",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = C.muted)}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = C.faint)}
+                >
+                  <Plus size={11} /> New collection…
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
         <div
           style={{
-            padding: "8px 14px",
-            borderTop: `1px solid ${C.border}`,
-          }}
-        >
-          <input
-            ref={inputRef}
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") submit();
-              if (e.key === "Escape") {
-                setCreating(false);
-                setNewName("");
-              }
-            }}
-            placeholder="Collection name…"
-            style={{
-              width: "100%",
-              fontSize: 12,
-              fontFamily: FONT_SANS,
-              border: "none",
-              borderBottom: `1px solid ${C.border}`,
-              outline: "none",
-              background: "transparent",
-              color: C.ink,
-              paddingBottom: 4,
-              marginBottom: 8,
-            }}
-          />
-          <div style={{ display: "flex", gap: 6 }}>
-            <Btn variant="primary" size="xs" onClick={submit}>
-              <Check size={10} /> Create
-            </Btn>
-            <Btn
-              variant="ghost"
-              size="xs"
-              onClick={() => {
-                setCreating(false);
-                setNewName("");
-              }}
-            >
-              Cancel
-            </Btn>
-          </div>
-        </div>
-      ) : (
-        <button
-          onClick={() => setCreating(true)}
-          style={{
-            width: "100%",
-            textAlign: "left",
-            padding: "10px 14px",
-            background: "transparent",
-            border: "none",
-            borderTop: `1px solid ${C.border}`,
-            cursor: "pointer",
-            fontFamily: FONT_SANS,
+            padding: "14px 28px 24px",
             display: "flex",
             alignItems: "center",
-            gap: 6,
-            color: C.faint,
-            fontSize: 12,
-            transition: "color 0.15s",
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = C.muted)}
-          onMouseLeave={(e) => (e.currentTarget.style.color = C.faint)}
-        >
-          <Plus size={11} /> New collection…
-        </button>
-      )}
-      <div
-        style={{
-          padding: "8px 14px",
-          borderTop: `1px solid ${C.border}`,
-          display: "flex",
-          justifyContent: "flex-end",
-          gap: 6,
-        }}
-      >
-        <Btn variant="ghost" size="xs" onClick={onClose}>
-          Cancel
-        </Btn>
-        <Btn
-          variant="primary"
-          size="xs"
-          onClick={() => {
-            onSave([...local]);
-            onClose();
+            justifyContent: "flex-end",
+            gap: 8,
+            borderTop: `1px solid ${C.border}`,
+            flexShrink: 0,
           }}
         >
-          <Check size={10} /> Done
-        </Btn>
+          <Btn variant="ghost" size="sm" onClick={onClose}>Cancel</Btn>
+          <Btn variant="primary" size="sm" onClick={handleSave} disabled={!quote.trim() || !book.trim()}>
+            <Check size={11} /> Save
+          </Btn>
+        </div>
       </div>
-    </div>
+    </>
   );
 });
 
@@ -1679,15 +1574,11 @@ export const NoteCard = memo(function NoteCard({
 }: NoteCardProps) {
   const C = useC();
   const T = makeT(C);
-  const [showAnnotation, setShowAnnotation] = useState(false);
-  const [showTagPicker, setShowTagPicker] = useState(false);
-  const [showQuoteEdit, setShowQuoteEdit] = useState(false);
+  const [showDetail, setShowDetail] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [showCollPicker, setShowCollPicker] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [pulse, setPulse] = useState(justSaved);
-  const pickerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -1697,26 +1588,16 @@ export const NoteCard = memo(function NoteCard({
       return () => clearTimeout(t);
     }
   }, [justSaved]);
+
   useEffect(() => {
-    if (!showCollPicker && !showMenu) return;
+    if (!showMenu) return;
     const h = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (
-        pickerRef.current &&
-        !pickerRef.current.contains(target)
-      ) {
-        setShowCollPicker(false);
-      }
-      if (
-        menuRef.current &&
-        !menuRef.current.contains(target)
-      ) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node))
         setShowMenu(false);
-      }
     };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
-  }, [showCollPicker, showMenu]);
+  }, [showMenu]);
 
   const cardColls = useMemo(
     () =>
@@ -1734,40 +1615,24 @@ export const NoteCard = memo(function NoteCard({
   const warm = isWarm(card);
   const py = compact ? 16 : 22;
 
-  const openQuoteEdit = () => setShowQuoteEdit(true);
+  const handleCardClick = () => {
+    if (selectable) { onSelect?.(card.id); return; }
+    if (window.getSelection()?.toString()) return;
+    setShowDetail(true);
+  };
 
   return (
     <>
-      {showQuoteEdit && (
-        <QuoteEditDrawer
+      {showDetail && (
+        <CardDetailDrawer
           card={card}
-          onSave={(quote, book, author) => {
-            onUpdate(card.id, { quote, book, author });
-            setShowQuoteEdit(false);
-          }}
-          onClose={() => setShowQuoteEdit(false)}
-          inputContainerRef={inputContainerRef}
-        />
-      )}
-      {showAnnotation && (
-        <AnnotationDrawer
-          card={card}
-          onSave={(note) => onUpdate(card.id, { note })}
-          onClose={() => setShowAnnotation(false)}
-          inputContainerRef={inputContainerRef}
-        />
-      )}
-      {showTagPicker && (
-        <TagPickerDrawer
-          suggestedTags={card.tags ?? []}
-          quote={card.quote}
-          book={card.book}
-          author={card.author}
-          onConfirm={(tags) => {
-            onTagsChange(card.id, tags);
-            setShowTagPicker(false);
-          }}
-          onDiscard={() => setShowTagPicker(false)}
+          collections={collections}
+          allCards={allCards}
+          onUpdate={onUpdate}
+          onTagsChange={onTagsChange}
+          onSetCollections={onSetCollections}
+          onCreateCollection={onCreateCollection}
+          onClose={() => setShowDetail(false)}
           inputContainerRef={inputContainerRef}
         />
       )}
@@ -1789,10 +1654,119 @@ export const NoteCard = memo(function NoteCard({
               ? C.surface
               : "transparent",
             transition: "background 0.15s ease",
+            cursor: selectable ? "pointer" : "default",
           }}
           className="nc-card"
-          onClick={selectable ? () => onSelect?.(card.id) : undefined}
+          onClick={handleCardClick}
         >
+        {/* Always-visible ··· menu (non-selectable mode) */}
+        {!selectable && (
+          <div
+            ref={menuRef}
+            style={{
+              position: "absolute",
+              top: py + 2,
+              right: 0,
+              zIndex: 5,
+            }}
+          >
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowMenu((v) => !v);
+              }}
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                padding: "2px 4px",
+                color: C.faint,
+                display: "flex",
+                alignItems: "center",
+                transition: "color 0.15s",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = C.ink)}
+              onMouseLeave={(e) => (e.currentTarget.style.color = C.faint)}
+            >
+              <MoreHorizontal size={14} />
+            </button>
+            {showMenu && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: 22,
+                  right: 0,
+                  background: C.base,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: R.lg,
+                  boxShadow: "0 8px 32px rgba(0,0,0,0.1)",
+                  minWidth: 160,
+                  zIndex: 10,
+                  overflow: "hidden",
+                  animation: "fadeIn 0.12s ease",
+                }}
+              >
+                {onElaborate && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowMenu(false);
+                      onElaborate(card);
+                    }}
+                    style={{
+                      width: "100%",
+                      textAlign: "left",
+                      padding: "10px 16px",
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: 13,
+                      fontFamily: FONT_SANS,
+                      color: C.secondary,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = C.surface)}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                  >
+                    <Sparkles size={12} /> Elaborate
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowMenu(false);
+                    setConfirmDelete(true);
+                  }}
+                  style={{
+                    width: "100%",
+                    textAlign: "left",
+                    padding: "10px 16px",
+                    background: "transparent",
+                    border: "none",
+                    borderTop: onElaborate ? `1px solid ${C.border}` : undefined,
+                    cursor: "pointer",
+                    fontSize: 13,
+                    fontFamily: FONT_SANS,
+                    color: C.danger,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = C.surface)}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                >
+                  <X size={12} /> Delete card
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {!selectable && (
           <div
             title={warm ? "Seen recently" : "Haven't visited in a while"}
@@ -1829,30 +1803,9 @@ export const NoteCard = memo(function NoteCard({
           </div>
         )}
 
-        {!selectable ? (
-          <p
-            onClick={openQuoteEdit}
-            style={{
-              ...T.quoteMain,
-              marginBottom: 10,
-              cursor: "text",
-              borderBottom: "1px dashed transparent",
-              transition: "border-color 0.15s",
-            }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.borderBottomColor = C.border)
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.borderBottomColor = "transparent")
-            }
-          >
-            "{card.quote}"
-          </p>
-        ) : (
-          <p style={{ ...T.quoteMain, marginBottom: 10, paddingRight: 28 }}>
-            "{card.quote}"
-          </p>
-        )}
+        <p style={{ ...T.quoteMain, marginBottom: 10, paddingRight: selectable ? 28 : 24 }}>
+          "{card.quote}"
+        </p>
 
         <div
           style={{
@@ -1863,100 +1816,21 @@ export const NoteCard = memo(function NoteCard({
             flexWrap: "wrap",
           }}
         >
-          {!selectable ? (
-            <>
-              <span
-                onClick={openQuoteEdit}
-                style={{
-                  ...T.book,
-                  cursor: "text",
-                  borderBottom: "1px dashed transparent",
-                  transition: "border-color 0.15s",
-                }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.borderBottomColor = C.border)
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.borderBottomColor = "transparent")
-                }
-              >
-                {card.book || "Book"}
-              </span>
-              <span
-                onClick={openQuoteEdit}
-                style={{
-                  ...T.author,
-                  cursor: "text",
-                  borderBottom: "1px dashed transparent",
-                  transition: "border-color 0.15s",
-                }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.borderBottomColor = C.border)
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.borderBottomColor = "transparent")
-                }
-              >
-                {card.author || "Author"}
-              </span>
-              {card.year && <span style={T.meta}>{fmtYear(card.year)}</span>}
-              {bookCount > 0 && (
-                <span
-                  style={{ ...T.meta, marginLeft: "auto", fontSize: 10 }}
-                >
-                  +{bookCount} from this book
-                </span>
-              )}
-            </>
-          ) : (
-            <>
-              <span style={T.book}>{card.book}</span>
-              {card.author && (
-                <span style={T.author}>{card.author}</span>
-              )}
-              {card.year && (
-                <span style={T.meta}>{fmtYear(card.year)}</span>
-              )}
-            </>
+          <span style={T.book}>{card.book || "Book"}</span>
+          <span style={T.author}>{card.author || "Author"}</span>
+          {card.year && <span style={T.meta}>{fmtYear(card.year)}</span>}
+          {!selectable && bookCount > 0 && (
+            <span style={{ ...T.meta, marginLeft: "auto", fontSize: 10 }}>
+              +{bookCount} from this book
+            </span>
           )}
         </div>
 
-        {selectable ? (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {card.tags?.map((t) => (
-              <Tag key={t}>{t}</Tag>
-            ))}
-          </div>
-        ) : (
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              alignItems: "center",
-              gap: 8,
-            }}
-          >
-            {(card.tags ?? []).map((t) => (
-              <Tag key={t}>{t}</Tag>
-            ))}
-            <button
-              onClick={() => setShowTagPicker(true)}
-              style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                color: C.faint,
-                padding: "1px 2px",
-                display: "inline-flex",
-                transition: "color 0.15s",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = C.muted)}
-              onMouseLeave={(e) => (e.currentTarget.style.color = C.faint)}
-            >
-              <Pencil size={10} />
-            </button>
-          </div>
-        )}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {(card.tags ?? []).map((t) => (
+            <Tag key={t}>{t}</Tag>
+          ))}
+        </div>
 
         {!selectable && card.note && (
           <div style={{ marginTop: 12 }}>
@@ -1978,6 +1852,14 @@ export const NoteCard = memo(function NoteCard({
           </div>
         )}
 
+        {!selectable && cardColls.length > 0 && (
+          <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 5 }}>
+            {cardColls.map((col) => (
+              <Chip key={col.id} color={col.color}>{col.name}</Chip>
+            ))}
+          </div>
+        )}
+
         {confirmDelete && (
           <div
             style={{
@@ -1991,13 +1873,11 @@ export const NoteCard = memo(function NoteCard({
               gap: 10,
             }}
           >
-            <span
-              style={{ fontSize: 13, color: C.danger, flex: 1 }}
-            >
+            <span style={{ fontSize: 13, color: C.danger, flex: 1 }}>
               Delete this card permanently?
             </span>
             <button
-              onClick={() => onDelete(card.id)}
+              onClick={(e) => { e.stopPropagation(); onDelete(card.id); }}
               style={{
                 fontSize: 13,
                 fontWeight: 600,
@@ -2010,7 +1890,7 @@ export const NoteCard = memo(function NoteCard({
               Delete
             </button>
             <button
-              onClick={() => setConfirmDelete(false)}
+              onClick={(e) => { e.stopPropagation(); setConfirmDelete(false); }}
               style={{
                 fontSize: 13,
                 color: C.muted,
@@ -2020,217 +1900,6 @@ export const NoteCard = memo(function NoteCard({
               }}
             >
               Cancel
-            </button>
-          </div>
-        )}
-
-        {!selectable && cardColls.length > 0 && (
-          <div
-            style={{ marginTop: 10, position: "relative" }}
-            ref={pickerRef}
-          >
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                alignItems: "center",
-                gap: 5,
-              }}
-            >
-              {cardColls.map((col) => (
-                <Chip
-                  key={col.id}
-                  color={col.color}
-                  onRemove={() =>
-                    onSetCollections(
-                      card.id,
-                      (card.collectionIds ?? []).filter((id) => id !== col.id)
-                    )
-                  }
-                >
-                  {col.name}
-                </Chip>
-              ))}
-            </div>
-            {showCollPicker && (
-              <CollectionPopover
-                card={card}
-                collections={collections}
-                onSave={(ids) => onSetCollections(card.id, ids)}
-                onCreateNew={(col) => onCreateCollection(col)}
-                onClose={() => setShowCollPicker(false)}
-              />
-            )}
-          </div>
-        )}
-
-        {!selectable && (
-          <div
-            style={{
-              marginTop: 10,
-              paddingTop: 6,
-              borderTop: `1px solid ${C.border}`,
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              fontSize: 11,
-              fontFamily: FONT_SANS,
-              textTransform: "uppercase",
-              letterSpacing: "0.08em",
-              color: C.faint,
-              opacity: hovered ? 1 : 0,
-              transition: "opacity 0.15s ease",
-            }}
-          >
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowAnnotation(true);
-              }}
-              style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                padding: 0,
-                fontSize: "inherit",
-                fontFamily: "inherit",
-                textTransform: "inherit",
-                letterSpacing: "inherit",
-                color: "inherit",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 4,
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = C.ink)}
-              onMouseLeave={(e) => (e.currentTarget.style.color = C.faint)}
-            >
-              <Pencil size={10} />
-              <span>✎ Annotate</span>
-            </button>
-            <span>·</span>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowCollPicker(true);
-              }}
-              style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                padding: 0,
-                fontSize: "inherit",
-                fontFamily: "inherit",
-                textTransform: "inherit",
-                letterSpacing: "inherit",
-                color: "inherit",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 4,
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = C.ink)}
-              onMouseLeave={(e) => (e.currentTarget.style.color = C.faint)}
-            >
-              <FolderPlus size={10} />
-              <span>⊕ Add to Collection</span>
-            </button>
-            {onElaborate && (
-              <>
-                <span>·</span>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onElaborate(card);
-                  }}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    padding: 0,
-                    fontSize: "inherit",
-                    fontFamily: "inherit",
-                    textTransform: "inherit",
-                    letterSpacing: "inherit",
-                    color: "inherit",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 4,
-                  }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.color = C.ink)
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.color = C.faint)
-                  }
-                >
-                  <Sparkles size={10} />
-                  <span>✦ Elaborate</span>
-                </button>
-              </>
-            )}
-            <span>·</span>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowMenu((v) => !v);
-              }}
-              style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                padding: 0,
-                fontSize: "inherit",
-                fontFamily: "inherit",
-                textTransform: "inherit",
-                letterSpacing: "inherit",
-                color: "inherit",
-                position: "relative",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = C.ink)}
-              onMouseLeave={(e) => (e.currentTarget.style.color = C.faint)}
-            >
-              ···
-              {showMenu && (
-                <div
-                  ref={menuRef}
-                  style={{
-                    position: "absolute",
-                    top: 18,
-                    right: 0,
-                    background: C.base,
-                    border: `1px solid ${C.border}`,
-                    borderRadius: R.lg,
-                    boxShadow: "0 8px 32px rgba(0,0,0,0.1)",
-                    minWidth: 140,
-                    zIndex: 10,
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowMenu(false);
-                      setConfirmDelete(true);
-                    }}
-                    style={{
-                      width: "100%",
-                      textAlign: "left",
-                      padding: "10px 16px",
-                      background: "transparent",
-                      border: "none",
-                      cursor: "pointer",
-                      fontSize: 13,
-                      fontFamily: FONT_SANS,
-                      color: C.danger,
-                    }}
-                  >
-                    Delete card
-                  </button>
-                </div>
-              )}
             </button>
           </div>
         )}
