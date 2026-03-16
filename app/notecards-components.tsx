@@ -2215,6 +2215,7 @@ export const NoteCard = memo(function NoteCard({
           </div>
         )}
       </div>
+    </div>
     </>
   );
 });
