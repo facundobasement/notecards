@@ -445,74 +445,6 @@ async function smartWrite(topic: string, cards: any[], signal: AbortSignal) {
   };
 }
 
-async function smartDraft(topic: string, cards: any[], signal: AbortSignal) {
-  const relevant = topic
-    ? cards.filter(
-        (c) =>
-          c.tags.some((t: string) =>
-            t.includes(topic.toLowerCase()),
-          ) ||
-          c.quote.toLowerCase().includes(topic.toLowerCase()) ||
-          c.book.toLowerCase().includes(topic.toLowerCase()),
-      )
-    : cards;
-  const sample = (relevant.length ? relevant : cards).slice(0, 10);
-  const prompt = `You are a brilliant essayist. Using ONLY the quotes below as scaffolding, write a sharp essay fragment (350-450 words) on: "${topic || "the ideas in this collection"}". Weave quotes in naturally with attribution. Write in second person. End mid-thought.\n\nQuotes:\n${sample.map(cardToCtx).join("\n")}\n\nJSON: {"draft":"<essay>","used_indices":[<n>]}`;
-  const raw = await callClaude(
-    [{ role: "user", content: prompt }],
-    "Return ONLY JSON, no markdown fences.",
-    signal,
-  );
-  const p = await parseJSON(raw);
-  return {
-    draft: p.draft || "",
-    cards: (p.used_indices || []).map((i: number) => sample[i]).filter(Boolean),
-  };
-}
-
-async function findTensions(
-  cards: any[],
-  focus: string,
-  signal: AbortSignal,
-) {
-  if (cards.length < 2)
-    return { text: "Add more quotes to find tensions.", tensions: [] };
-  const pool = focus
-    ? cards.filter(
-        (c) =>
-          c.tags.some((t: string) =>
-            t.includes(focus.toLowerCase()),
-          ) || c.quote.toLowerCase().includes(focus.toLowerCase()),
-      )
-    : cards;
-  const src = pool.length >= 2 ? pool : cards;
-  const prompt = `Library:\n${src.slice(0, 30).map(cardToCtx).join("\n")}${focus ? `Focus: "${focus}"` : ""}\n\nFind 2-3 pairs with genuine contradictions. JSON: {"tensions":[{"indices":[i,j],"fault_line":"<1 sharp sentence>","provocation":"<1 sentence>"}]}`;
-  try {
-    const raw = await callClaude(
-      [{ role: "user", content: prompt }],
-      "Return ONLY JSON, no markdown.",
-      signal,
-    );
-    const p = await parseJSON(raw);
-    const tensions = (p.tensions || [])
-      .map((t: any) => ({
-        cards: (t.indices || []).map((i: number) => src[i]).filter(Boolean),
-        fault_line: t.fault_line,
-        provocation: t.provocation,
-      }))
-      .filter((t: any) => t.cards.length >= 2);
-    return {
-      text: tensions.length
-        ? `Found ${tensions.length} tension${tensions.length !== 1 ? "s" : ""} in your library:`
-        : "No strong tensions found.",
-      tensions,
-    };
-  } catch (e: any) {
-    if (e?.name === "AbortError") throw e;
-    return { text: "Something went wrong.", tensions: [] };
-  }
-}
-
 async function suggestThemes(
   cards: any[],
   themes: any[],
@@ -608,45 +540,6 @@ async function suggestReading(cards: any[], signal: AbortSignal) {
   );
   const p = await parseJSON(raw);
   return p.suggestions || [];
-}
-
-async function generateQuiz(cards: any[], signal: AbortSignal) {
-  if (cards.length < 3) return null;
-  const sample = [...cards]
-    .sort(() => Math.random() - 0.5)
-    .slice(0, Math.min(cards.length, 12));
-  const prompt = `Given these notecards, create a quiz of 5 questions testing whether the user knows which book/author a quote came from.\n\nCards:\n${sample.map(cardToCtx).join("\n")}\n\nJSON: {"questions":[{"id":"q1","type":"attribution","quote":"<exact quote>","question":"<question>","options":["<correct>","<wrong1>","<wrong2>","<wrong3>"],"correct":0,"explanation":"<1 sentence>"}]}\n\nRules: correct answer always at index 0. Use only books/authors present in the cards.`;
-  const raw = await callClaude(
-    [{ role: "user", content: prompt }],
-    "Return ONLY JSON, no markdown.",
-    signal,
-  );
-  const p = await parseJSON(raw);
-  return (p.questions || []).map((q: any) => {
-    const sh = q.options.map((o: string, i: number) => ({ o, i })).sort(() => Math.random() - 0.5);
-    const nc = sh.findIndex((x: any) => x.i === 0);
-    return { ...q, options: sh.map((x: any) => x.o), correct: nc };
-  });
-}
-
-async function compareBooks(
-  bookA: string,
-  bookB: string,
-  cards: any[],
-  signal: AbortSignal,
-) {
-  const aC = cards.filter(
-    (c) => c.book.toLowerCase() === bookA.toLowerCase(),
-  );
-  const bC = cards.filter(
-    (c) => c.book.toLowerCase() === bookB.toLowerCase(),
-  );
-  const prompt = `Compare these two books based on the reader's saved quotes.\n\nBook A — "${bookA}":\n${aC.map(cardToCtx).join("\n") || "(no quotes saved)"}\n\nBook B — "${bookB}":\n${bC.map(cardToCtx).join("\n") || "(no quotes saved)"}\n\nWrite a sharp 3-paragraph comparison.`;
-  return await callClaude(
-    [{ role: "user", content: prompt }],
-    "You are a brilliant literary critic. Use *asterisks* for book titles.",
-    signal,
-  );
 }
 
 async function parseImportText(text: string, signal: AbortSignal) {
@@ -1228,20 +1121,6 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
       const { error } = await supabase.from("notecards").insert(cardToRow(card, userId));
       if (error) console.error("Supabase insert error:", error);
     }
-    setMessages((p) => [...p, mkMsg("user", { type: "text", text: "/tension habits" })]);
-    setLoading(true);
-    setLL("hunting for contradictions…");
-    abortRef.current?.abort();
-    abortRef.current = new AbortController();
-    try {
-      const result = await findTensions(DEMO_CARDS, "habits", abortRef.current.signal);
-      setMessages((p) => [...p, mkMsg("assistant", { type: "tension", text: result.text, tensions: result.tensions })]);
-    } catch (e: any) {
-      if (e?.name !== "AbortError")
-        setMessages((p) => [...p, mkMsg("assistant", { type: "text", text: "Try /tension to find contradictions in your library." })]);
-    }
-    setLoading(false);
-    setLL("");
   }, [userId]);
 
   const handleSend = useCallback(async () => {
@@ -1378,39 +1257,6 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
       });
       return;
     }
-    if (cmd === "/quiz" || cmd.startsWith("/quiz ")) {
-      if (sc.length < 3) {
-        setMessages((p) => [...p, mkMsg("user", { type: "text", text: raw })]);
-        setMessages((p) => [...p, mkMsg("assistant", { type: "text", text: "Add at least 3 cards to take a quiz." })]);
-        return;
-      }
-      await ai(raw, "writing your quiz…", async (sig) => {
-        const questions = await generateQuiz(sc, sig);
-        if (questions?.length) setMessages((p) => [...p, mkMsg("assistant", { type: "quiz", questions })]);
-        else setMessages((p) => [...p, mkMsg("assistant", { type: "text", text: "Couldn't generate a quiz — try adding more cards." })]);
-      });
-      return;
-    }
-    if (cmd.startsWith("/compare")) {
-      const arg = raw.slice(8).trim();
-      const sep = arg.match(/\s+vs\.?\s+/i);
-      if (!sep || !arg) {
-        setMessages((p) => [...p, mkMsg("user", { type: "text", text: raw })]);
-        setMessages((p) => [...p, mkMsg("assistant", { type: "text", text: "Try `/compare *Book A* vs *Book B*`" })]);
-        return;
-      }
-      const [bookA, bookB] = arg.split(sep[0]).map((s) => s.trim());
-      if (!bookA || !bookB) {
-        setMessages((p) => [...p, mkMsg("user", { type: "text", text: raw })]);
-        setMessages((p) => [...p, mkMsg("assistant", { type: "text", text: "I need two book titles." })]);
-        return;
-      }
-      await ai(raw, "comparing…", async (sig) => {
-        const text = await compareBooks(bookA, bookB, sc, sig);
-        setMessages((p) => [...p, mkMsg("assistant", { type: "compare", bookA, bookB, text })]);
-      });
-      return;
-    }
     if (cmd.startsWith("/add")) {
       const body = raw.slice(4).trim().replace(/^[""'""]|[""'""]$/g, "");
       setMessages((p) => [...p, mkMsg("user", { type: "text", text: raw })]);
@@ -1447,28 +1293,6 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
       await ai(raw, "crafting prompts…", async (sig) => {
         const r = await smartWrite(topic, sc, sig);
         setMessages((p) => [...p, mkMsg("assistant", { type: "write", prompts: r.prompts, cards: r.cards })]);
-      });
-      return;
-    }
-    if (cmd.startsWith("/draft")) {
-      const topic = raw.slice(6).trim();
-      if (!topic && sc.length < 3) {
-        setMessages((p) => [...p, mkMsg("user", { type: "text", text: raw })]);
-        setMessages((p) => [...p, mkMsg("assistant", { type: "text", text: "Add a topic after `/draft`, or save more cards first." })]);
-        return;
-      }
-      await ai(raw, "drafting…", async (sig) => {
-        const r = await smartDraft(topic || "the ideas in my collection", sc, sig);
-        setMessages((p) => [...p, mkMsg("assistant", { type: "draft", draft: r.draft, cards: r.cards })]);
-      });
-      return;
-    }
-    if (cmd.startsWith("/tension")) {
-      const focusArg = raw.slice(8).trim();
-      await ai(raw, "hunting for contradictions…", async (sig) => {
-        const result = await findTensions(sc, focusArg, sig);
-        lastShownIds.current = result.tensions?.flatMap((t: { cards: { id: string }[] }) => t.cards.map((c) => c.id)) ?? [];
-        setMessages((p) => [...p, mkMsg("assistant", { type: "tension", text: result.text, tensions: result.tensions })]);
       });
       return;
     }

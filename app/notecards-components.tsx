@@ -236,29 +236,10 @@ export const COMMANDS = [
   { cmd: "/read", hint: "", desc: "Start a focused reading session", icon: "📖" },
   { cmd: "/digest", hint: "", desc: "Today's themed cards", icon: "☀" },
   {
-    cmd: "/tension",
-    hint: "topic (optional)",
-    desc: "Find contradictions between quotes",
-    icon: "⚡",
-  },
-  {
     cmd: "/write",
     hint: "topic (optional)",
     desc: "3 writing prompts from your cards",
     icon: "✐",
-  },
-  { cmd: "/draft", hint: "topic", desc: "Generate an essay fragment", icon: "✍" },
-  {
-    cmd: "/quiz",
-    hint: "",
-    desc: "Test your memory of your library",
-    icon: "🎯",
-  },
-  {
-    cmd: "/compare",
-    hint: "Book A vs Book B",
-    desc: "Compare two books",
-    icon: "⚖",
   },
   {
     cmd: "/recommend",
@@ -293,8 +274,8 @@ export function getPlaceholder(
   const examples = [
     "Ask a question, or type / for commands…",
     `/find ${cards[0]?.tags?.[0] ?? "stoicism"}`,
-    "/quiz · /compare · /tension",
-    "/write or /draft to think with your cards",
+    "/read to start a focused session",
+    "/recommend for books you'll love",
   ];
   return examples[Math.floor(NOW() / 30000) % examples.length];
 }
