@@ -732,14 +732,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
       try {
         const result = await generateDigest(cards, ctrl.signal);
         if (result?.cards?.length) {
-          result.cards.forEach((c: { id: string }) => {
-            dispatch({ type: "SEEN", id: c.id });
-            void supabase
-              .from("notecards")
-              .update({ last_seen_at: new Date().toISOString() })
-              .eq("id", c.id)
-              .eq("user_id", userId);
-          });
+          result.cards.forEach((c: { id: string }) => markCardSeen(c.id));
           setMessages((p) => [...p, mkMsg("assistant", { type: "digest", framing: result.framing, cards: result.cards })]);
         } else {
           setMessages((p) => [
@@ -828,6 +821,18 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
     [userId]
   );
 
+  const markCardSeen = useCallback(
+    (id: string) => {
+      dispatch({ type: "SEEN", id });
+      void supabase
+        .from("notecards")
+        .update({ last_seen_at: new Date().toISOString() })
+        .eq("id", id)
+        .eq("user_id", userId);
+    },
+    [userId]
+  );
+
   const createCollection = useCallback((col: { id: string; name: string; color: string; createdAt?: number }) => setCollections((p) => [...p, col]), []);
   const confirmTheme = useCallback(
     (theme: { id: string; name: string; description: string; cardIds: string[]; confirmed?: boolean }) => {
@@ -846,15 +851,10 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
   const openRandom = useCallback(() => {
     if (!cards.length) return;
     const card = pickRandom(cards);
-    dispatch({ type: "SEEN", id: card.id });
-    void supabase
-      .from("notecards")
-      .update({ last_seen_at: new Date().toISOString() })
-      .eq("id", card.id)
-      .eq("user_id", userId);
+    markCardSeen(card.id);
     setRandomCard(card);
     setShowLibrary(false);
-  }, [cards, userId, pickRandom]);
+  }, [cards, pickRandom, markCardSeen]);
 
   const nextRandom = useCallback(() => {
     if (cards.length <= 1) return;
@@ -863,15 +863,10 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
       do {
         n = pickRandom(cards);
       } while (n.id === prev?.id && cards.length > 1);
-      dispatch({ type: "SEEN", id: n.id });
-      void supabase
-        .from("notecards")
-        .update({ last_seen_at: new Date().toISOString() })
-        .eq("id", n.id)
-        .eq("user_id", userId);
+      markCardSeen(n.id);
       return n;
     });
-  }, [cards, userId, pickRandom]);
+  }, [cards, pickRandom, markCardSeen]);
 
   const dismissConnection = useCallback(
     (id: string) =>
@@ -1123,6 +1118,8 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
     }
   }, [userId]);
 
+  const libraryCtx = useMemo(() => cards.map((c) => cardToCtx(c)).join("\n\n"), [cards]);
+
   const handleSend = useCallback(async () => {
     const raw = input.trim();
     if (!raw || loading) return;
@@ -1197,8 +1194,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
       }
       setMessages((p) => [...p, mkMsg("user", { type: "text", text: "/random" })]);
       const card = pickRandom(sc);
-      dispatch({ type: "SEEN", id: card.id });
-      void supabase.from("notecards").update({ last_seen_at: new Date().toISOString() }).eq("id", card.id).eq("user_id", userId);
+      markCardSeen(card.id);
       setRandomCard(card);
       return;
     }
@@ -1223,10 +1219,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
       await ai("/digest", "curating today's cards…", async (sig) => {
         const result = await generateDigest(sc, sig);
         if (result) {
-          result.cards.forEach((c: { id: string }) => {
-            dispatch({ type: "SEEN", id: c.id });
-            void supabase.from("notecards").update({ last_seen_at: new Date().toISOString() }).eq("id", c.id).eq("user_id", userId);
-          });
+          result.cards.forEach((c: { id: string }) => markCardSeen(c.id));
           setMessages((p) => [...p, mkMsg("assistant", { type: "digest", framing: result.framing, cards: result.cards })]);
         } else setMessages((p) => [...p, mkMsg("assistant", { type: "text", text: "Add more cards to get a daily digest." })]);
       });
@@ -1302,7 +1295,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
     setLL("thinking…");
     abortRef.current?.abort();
     abortRef.current = new AbortController();
-    const lib = sc.map((c) => cardToCtx(c)).join("\n\n");
+    const lib = libraryCtx;
     const lastCtx = lastShownIds.current.length ? `\n\nLast shown IDs: ${lastShownIds.current.join(", ")}.` : "";
     const sys = `${SYSTEM}\n\nLibrary:\n${lib || "Empty."}${lastCtx}`;
     const history = messagesRef.current
@@ -1330,6 +1323,8 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
     submitManualBook,
     pickRandom,
     personalBooks,
+    libraryCtx,
+    markCardSeen,
   ]);
 
   useEffect(() => {
@@ -1375,7 +1370,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
 
   const showEmpty = !cardsLoading && cards.length === 0 && messages.length === 0;
   const hasInput = input.trim().length > 0;
-  const msgCardProps = {
+  const msgCardProps = useMemo(() => ({
     collections,
     allCards: cards,
     onUpdate: updateCard,
@@ -1386,25 +1381,16 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
     onElaborate: handleElaborate,
     savedCardId,
     inputContainerRef,
-  };
+  }), [collections, cards, updateCard, updateTags, deleteCard, setCardCols, createCollection, handleElaborate, savedCardId]);
 
   return (
     <ThemeCtx.Provider value={C}>
       <div style={{ fontFamily: FONT_SANS, background: C.base, minHeight: "100vh" }}>
         <style>{`
           @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=DM+Sans:wght@300;400;500&display=swap');
-          @keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-6px)}}
-          @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
-          @keyframes drawerUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
-          @keyframes backdropIn{from{opacity:0}to{opacity:1}}
-          *{box-sizing:border-box;margin:0;padding:0}
-          .nc-card:hover .nc-action-btn{opacity:1!important}
           :focus-visible{outline:2px solid ${C.ink};outline-offset:2px}
           ::selection{background:${C.surfaceAlt}}
-          textarea,input{font-family:inherit}
-          ::-webkit-scrollbar{width:3px;height:3px}
-          ::-webkit-scrollbar-track{background:transparent}
-          ::-webkit-scrollbar-thumb{background:${C.border};border-radius:3px}
+          ::-webkit-scrollbar-thumb{background:${C.border}}
         `}</style>
 
         <button
