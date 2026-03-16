@@ -1676,8 +1676,10 @@ export const NoteCard = memo(function NoteCard({
   const [showQuoteEdit, setShowQuoteEdit] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showCollPicker, setShowCollPicker] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
   const [pulse, setPulse] = useState(justSaved);
   const pickerRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (justSaved) {
@@ -1687,14 +1689,25 @@ export const NoteCard = memo(function NoteCard({
     }
   }, [justSaved]);
   useEffect(() => {
-    if (!showCollPicker) return;
+    if (!showCollPicker && !showMenu) return;
     const h = (e: MouseEvent) => {
-      if (pickerRef.current && !pickerRef.current.contains(e.target as Node))
+      const target = e.target as Node;
+      if (
+        pickerRef.current &&
+        !pickerRef.current.contains(target)
+      ) {
         setShowCollPicker(false);
+      }
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(target)
+      ) {
+        setShowMenu(false);
+      }
     };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
-  }, [showCollPicker]);
+  }, [showCollPicker, showMenu]);
 
   const cardColls = useMemo(
     () =>
@@ -1781,47 +1794,98 @@ export const NoteCard = memo(function NoteCard({
               position: "absolute",
               top: py,
               right: 0,
-              display: "flex",
-              gap: 2,
             }}
-            className="nc-actions"
+            ref={menuRef}
           >
-            {onElaborate && (
-              <button
-                onClick={() => onElaborate(card)}
-                className="nc-action-btn"
-                title="Elaborate"
-                style={{
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  color: C.faint,
-                  padding: 4,
-                  borderRadius: R.sm,
-                  opacity: 0,
-                  transition: "opacity 0.15s",
-                }}
-              >
-                <Sparkles size={11} />
-              </button>
-            )}
             <button
-              onClick={() => setConfirmDelete((v) => !v)}
-              className="nc-action-btn"
-              title="Delete"
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowMenu((v) => !v);
+              }}
               style={{
                 background: "none",
                 border: "none",
                 cursor: "pointer",
                 color: C.faint,
                 padding: 4,
-                borderRadius: R.sm,
-                opacity: 0,
-                transition: "opacity 0.15s",
+                fontSize: 14,
+                letterSpacing: "0.1em",
+                opacity: 0.4,
+                transition: "opacity 0.15s, color 0.15s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.opacity = "1";
+                e.currentTarget.style.color = C.ink;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.opacity = "0.4";
+                e.currentTarget.style.color = C.faint;
               }}
             >
-              <X size={11} />
+              •••
             </button>
+            {showMenu && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: py + 24,
+                  right: 0,
+                  background: C.base,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: R.lg,
+                  boxShadow: "0 8px 32px rgba(0,0,0,0.1)",
+                  minWidth: 160,
+                  zIndex: 10,
+                }}
+              >
+                {onElaborate && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowMenu(false);
+                      onElaborate(card);
+                    }}
+                    style={{
+                      width: "100%",
+                      textAlign: "left",
+                      padding: "10px 16px",
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: 13,
+                      fontFamily: FONT_SANS,
+                      color: C.ink,
+                    }}
+                  >
+                    ✦ Elaborate
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowMenu(false);
+                    setConfirmDelete(true);
+                  }}
+                  style={{
+                    width: "100%",
+                    textAlign: "left",
+                    padding: "10px 16px",
+                    background: "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: 13,
+                    fontFamily: FONT_SANS,
+                    color: C.danger,
+                    borderTop: `1px solid ${C.border}`,
+                  }}
+                >
+                  Delete card
+                </button>
+              </div>
+            )}
           </div>
         )}
         {selectable && (
