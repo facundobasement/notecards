@@ -1099,6 +1099,9 @@ const CardDetailDrawer = memo(function CardDetailDrawer({
   const [selectedColIds, setSelectedColIds] = useState<Set<string>>(new Set(card.collectionIds ?? []));
   const [creatingCol, setCreatingCol] = useState(false);
   const [newColName, setNewColName] = useState("");
+  // Evolving reflections
+  const [editingReflection, setEditingReflection] = useState(false);
+  const [newReflection, setNewReflection] = useState("");
   // Sections
   const [expandedSection, setExpandedSection] = useState<string>("quote");
 
@@ -1345,25 +1348,109 @@ const CardDetailDrawer = memo(function CardDetailDrawer({
           {sectionHeader("annotation", "Annotation", note ? `${wordCount} words` : undefined)}
           {expandedSection === "annotation" && (
             <div style={{ paddingBottom: 16 }}>
-              <textarea
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="What does this quote mean to you?"
-                style={{
-                  width: "100%",
-                  minHeight: 100,
-                  fontSize: 15,
-                  fontFamily: FONT_SERIF,
-                  lineHeight: 1.85,
-                  color: C.ink,
-                  background: "transparent",
-                  border: "none",
-                  outline: "none",
-                  resize: "none",
-                  padding: 0,
-                }}
-              />
-              {wordCount > 0 && <span style={T.caption}>{wordCount} words</span>}
+              {/* Show existing reflections as read-only blocks */}
+              {(() => {
+                const parts = note.split(/\n\n\u2014 /);
+                const initial = parts[0] ?? "";
+                const reflections = parts.slice(1).map((p) => {
+                  const nl = p.indexOf("\n");
+                  return { date: p.slice(0, nl > 0 ? nl : p.length), text: nl > 0 ? p.slice(nl + 1) : "" };
+                }).filter((r) => r.text);
+                return (
+                  <>
+                    <textarea
+                      value={editingReflection ? initial : note}
+                      onChange={(e) => {
+                        if (editingReflection) {
+                          const rest = parts.slice(1).map((p) => `\u2014 ${p}`).join("\n\n");
+                          setNote(rest ? `${e.target.value}\n\n${rest}` : e.target.value);
+                        } else {
+                          setNote(e.target.value);
+                        }
+                      }}
+                      placeholder="What does this quote mean to you?"
+                      style={{
+                        width: "100%",
+                        minHeight: reflections.length > 0 ? 60 : 100,
+                        fontSize: 15,
+                        fontFamily: FONT_SERIF,
+                        lineHeight: 1.85,
+                        color: C.ink,
+                        background: "transparent",
+                        border: "none",
+                        outline: "none",
+                        resize: "none",
+                        padding: 0,
+                        display: editingReflection ? "none" : undefined,
+                      }}
+                    />
+                    {reflections.length > 0 && !editingReflection && (
+                      <div style={{ marginTop: 12 }}>
+                        {reflections.map((r, i) => (
+                          <div key={i} style={{ marginBottom: 12, paddingLeft: 12, borderLeft: `2px solid ${C.border}` }}>
+                            <p style={{ fontSize: 10, color: C.faint, fontFamily: FONT_SANS, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>{r.date}</p>
+                            <p style={{ fontSize: 13, color: C.muted, fontFamily: FONT_SERIF, lineHeight: 1.7, whiteSpace: "pre-line" }}>{r.text}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+              {editingReflection ? (
+                <div style={{ marginTop: 8 }}>
+                  <textarea
+                    autoFocus
+                    value={newReflection}
+                    onChange={(e) => setNewReflection(e.target.value)}
+                    placeholder="What do you think now?"
+                    rows={3}
+                    style={{
+                      width: "100%",
+                      fontSize: 14,
+                      fontFamily: FONT_SERIF,
+                      lineHeight: 1.7,
+                      border: `1px solid ${C.border}`,
+                      borderRadius: R.md,
+                      background: "transparent",
+                      color: C.ink,
+                      outline: "none",
+                      resize: "vertical",
+                      padding: "10px 12px",
+                    }}
+                  />
+                  <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8 }}>
+                    <Btn variant="ghost" size="xs" onClick={() => { setEditingReflection(false); setNewReflection(""); }}>Cancel</Btn>
+                    <Btn variant="outline" size="xs" disabled={!newReflection.trim()} onClick={() => {
+                      const monthYear = new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
+                      const base = note || "";
+                      setNote(base ? `${base}\n\n\u2014 ${monthYear}\n${newReflection.trim()}` : newReflection.trim());
+                      setNewReflection("");
+                      setEditingReflection(false);
+                    }}><Check size={10} /> Save</Btn>
+                  </div>
+                </div>
+              ) : note.trim() ? (
+                <button
+                  onClick={() => setEditingReflection(true)}
+                  style={{
+                    marginTop: 8,
+                    fontSize: 12,
+                    color: C.faint,
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    fontFamily: FONT_SANS,
+                    padding: 0,
+                    transition: "color 0.15s",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = C.secondary)}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = C.faint)}
+                >
+                  + Add a new reflection
+                </button>
+              ) : null}
+              {wordCount > 0 && <span style={{ ...T.caption, marginTop: 6, display: "block" }}>{wordCount} words</span>}
             </div>
           )}
           <div style={{ height: 1, background: C.border, opacity: 0.6 }} />
@@ -4387,6 +4474,7 @@ export const LibraryPanel = memo(function LibraryPanel({
   const T = makeT(C);
   const [filters, setFilters] = useState<Filter[]>([]);
   const [search, setSearch] = useState("");
+  const [viewMode, setViewMode] = useState<"book" | "all">("book");
   const scrollRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -4510,6 +4598,27 @@ export const LibraryPanel = memo(function LibraryPanel({
               </span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <div style={{ display: "flex", borderRadius: R.md, border: `1px solid ${C.border}`, overflow: "hidden", marginRight: 4 }}>
+                {(["all", "book"] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    onClick={() => setViewMode(mode)}
+                    style={{
+                      padding: "4px 10px",
+                      fontSize: 11,
+                      fontFamily: FONT_SANS,
+                      fontWeight: viewMode === mode ? 500 : 400,
+                      background: viewMode === mode ? C.ink : "transparent",
+                      color: viewMode === mode ? C.base : C.faint,
+                      border: "none",
+                      cursor: "pointer",
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    {mode === "all" ? "All" : "By Book"}
+                  </button>
+                ))}
+              </div>
               <Btn variant="ghost" size="sm" onClick={onRandom}>
                 <Shuffle size={12} /> Random
               </Btn>
@@ -4619,7 +4728,7 @@ export const LibraryPanel = memo(function LibraryPanel({
             padding: "4px 28px 100px",
           }}
         >
-          {bookGroups.length === 0 ? (
+          {visible.length === 0 ? (
             <div style={{ textAlign: "center", padding: "80px 0" }}>
               <p style={T.small}>
                 {search
@@ -4648,7 +4757,7 @@ export const LibraryPanel = memo(function LibraryPanel({
                 </button>
               )}
             </div>
-          ) : (
+          ) : viewMode === "book" ? (
             bookGroups.map(([heading, groupCards]) => (
               <div
                 key={heading}
@@ -4681,6 +4790,12 @@ export const LibraryPanel = memo(function LibraryPanel({
                 ))}
               </div>
             ))
+          ) : (
+            <div style={{ paddingTop: 12 }}>
+              {[...visible].sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0)).map((c) => (
+                <NoteCard key={c.id} card={c} {...cardProps} />
+              ))}
+            </div>
           )}
         </div>
       </div>
@@ -4697,287 +4812,149 @@ export const ExportPanel = memo(function ExportPanel({
 }) {
   const C = useC();
   const T = makeT(C);
-  const [selected, setSelected] = useState(
-    () => new Set(cards.map((c) => c.id))
-  );
-  const [activeTag, setActiveTag] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const tags = useMemo(
-    () =>
-      [...new Set(cards.flatMap((c) => c.tags ?? []))].map((tag) => ({
-        tag,
-        count: cards.filter((c) => (c.tags ?? []).includes(tag)).length,
-      })),
-    [cards]
-  );
-  const visible = useMemo(
-    () =>
-      activeTag
-        ? cards.filter((c) => (c.tags ?? []).includes(activeTag))
-        : cards,
-    [cards, activeTag]
-  );
-  const exportText = useMemo(
-    () =>
-      cards
-        .filter((c) => selected.has(c.id))
-        .map(cardToExport)
-        .join("\n"),
-    [cards, selected]
-  );
+  const [downloading, setDownloading] = useState(false);
+
+  const exportText = useMemo(() => cards.map(cardToExport).join("\n"), [cards]);
+
   useKey("Escape", onClose, [onClose]);
+
   const doCopy = async () => {
     await copyText(exportText);
     setCopied(true);
-    setTimeout(() => {
-      setCopied(false);
-      onClose();
-    }, 1600);
+    setTimeout(() => { setCopied(false); onClose(); }, 1400);
   };
+
+  const doDownload = () => {
+    const json = JSON.stringify(cards.map((c) => ({
+      quote: c.quote,
+      book: c.book,
+      author: c.author || undefined,
+      year: c.year ?? undefined,
+      tags: c.tags?.length ? c.tags : undefined,
+      note: c.note || undefined,
+    })), null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `notecards-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setDownloading(true);
+    setTimeout(() => { setDownloading(false); onClose(); }, 1400);
+  };
+
   return (
     <div
       role="dialog"
       aria-modal="true"
+      onClick={onClose}
       style={{
         position: "fixed",
         inset: 0,
-        background: C.base,
+        background: "rgba(0,0,0,0.15)",
         zIndex: 150,
         display: "flex",
-        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
         fontFamily: FONT_SANS,
       }}
     >
       <div
+        onClick={(e) => e.stopPropagation()}
         style={{
-          flexShrink: 0,
-          borderBottom: `1px solid ${C.border}`,
           background: C.base,
+          border: `1px solid ${C.border}`,
+          borderRadius: R.xl,
+          padding: "32px 36px",
+          maxWidth: 400,
+          width: "100%",
+          boxShadow: "0 16px 60px rgba(0,0,0,0.12)",
         }}
       >
-        <div style={{ maxWidth: 660, margin: "0 auto", padding: "0 28px" }}>
-          <div
+        <p style={{ fontSize: 15, fontWeight: 600, color: C.ink, marginBottom: 6, letterSpacing: "-0.01em" }}>
+          Export your library
+        </p>
+        <p style={{ ...T.caption, marginBottom: 24 }}>
+          {cards.length} card{cards.length !== 1 ? "s" : ""}
+        </p>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <button
+            onClick={doCopy}
             style={{
-              height: 52,
               display: "flex",
               alignItems: "center",
-              justifyContent: "space-between",
+              gap: 10,
+              padding: "14px 18px",
+              border: `1px solid ${C.border}`,
+              borderRadius: R.lg,
+              background: copied ? C.sage : "transparent",
+              cursor: "pointer",
+              transition: "all 0.15s",
+              textAlign: "left",
             }}
+            onMouseEnter={(e) => { if (!copied) e.currentTarget.style.borderColor = C.borderHover; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.border; }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span
-                style={{
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: C.ink,
-                  letterSpacing: "-0.01em",
-                }}
-              >
-                Export
-              </span>
-              <span style={{ ...T.meta, opacity: 0.4, marginLeft: 4 }}>·</span>
-              <span style={{ ...T.caption, marginLeft: 4 }}>
-                {selected.size} of {cards.length} selected
-              </span>
+            <div style={{ width: 32, height: 32, borderRadius: R.md, background: C.surface, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {copied ? <Check size={14} color={C.ink} /> : <Copy size={14} color={C.muted} />}
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <Btn
-                variant="primary"
-                size="sm"
-                onClick={doCopy}
-                disabled={!selected.size}
-                style={copied ? { background: C.sage } : {}}
-              >
-                {copied ? (
-                  <>
-                    <Check size={13} /> Copied
-                  </>
-                ) : (
-                  <>
-                    <Copy size={13} /> Copy {selected.size || ""} card
-                    {selected.size !== 1 ? "s" : ""}
-                  </>
-                )}
-              </Btn>
-              <Btn variant="ghost" size="sm" onClick={onClose}>
-                <X size={12} /> Close
-              </Btn>
+            <div>
+              <p style={{ fontSize: 13, fontWeight: 500, color: C.ink, marginBottom: 2 }}>
+                {copied ? "Copied!" : "Copy as text"}
+              </p>
+              <p style={{ fontSize: 11, color: C.faint }}>Formatted quotes, ready to paste</p>
             </div>
-          </div>
-        </div>
-      </div>
-      <div
-        style={{
-          borderBottom: `1px solid ${C.border}`,
-          flexShrink: 0,
-        }}
-      >
-        <div
-          style={{
-            maxWidth: 660,
-            margin: "0 auto",
-            padding: "10px 28px",
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-          }}
-        >
-          <div
+          </button>
+
+          <button
+            onClick={doDownload}
             style={{
               display: "flex",
-              gap: 5,
-              overflowX: "auto",
-              scrollbarWidth: "none",
-              flex: 1,
+              alignItems: "center",
+              gap: 10,
+              padding: "14px 18px",
+              border: `1px solid ${C.border}`,
+              borderRadius: R.lg,
+              background: downloading ? C.sage : "transparent",
+              cursor: "pointer",
+              transition: "all 0.15s",
+              textAlign: "left",
             }}
+            onMouseEnter={(e) => { if (!downloading) e.currentTarget.style.borderColor = C.borderHover; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.border; }}
           >
-            {[
-              { tag: null as string | null, label: "All" },
-              ...tags.map(({ tag }) => ({ tag, label: tag })),
-            ].map(({ tag, label }) => {
-              const active = activeTag === tag || (!tag && !activeTag);
-              return (
-                <button
-                  key={label}
-                  onClick={() =>
-                    setActiveTag((p) => (p === tag ? null : tag))
-                  }
-                  style={{
-                    padding: "5px 12px",
-                    borderRadius: R.pill,
-                    fontSize: 12,
-                    fontFamily: FONT_SANS,
-                    fontWeight: active ? 500 : 400,
-                    background: active ? C.ink : C.surface,
-                    color: active ? C.base : C.muted,
-                    border: `1px solid ${active ? C.ink : C.border}`,
-                    cursor: "pointer",
-                    whiteSpace: "nowrap",
-                    transition: "all 0.15s",
-                  }}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </div>
-          <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-            <Btn
-              variant="ghost"
-              size="xs"
-              onClick={() =>
-                setSelected(new Set(cards.map((c) => c.id)))
-              }
-            >
-              All
-            </Btn>
-            <Btn
-              variant="ghost"
-              size="xs"
-              onClick={() => setSelected(new Set())}
-            >
-              None
-            </Btn>
-          </div>
-        </div>
-      </div>
-      <div style={{ flex: 1, overflowY: "auto" }}>
-        <div
-          style={{
-            maxWidth: 660,
-            margin: "0 auto",
-            padding: "4px 28px 100px",
-          }}
-        >
-          <p style={{ ...T.caption, marginTop: 14, marginBottom: 6 }}>
-            Tap to select or deselect
-          </p>
-          <Divider />
-          {visible.map((c) => (
-            <div
-              key={c.id}
-              style={{
-                padding: "16px 0",
-                borderBottom: `1px solid ${C.border}`,
-                cursor: "pointer",
-                position: "relative",
-              }}
-              onClick={() =>
-                setSelected((s) => {
-                  const n = new Set(s);
-                  n.has(c.id) ? n.delete(c.id) : n.add(c.id);
-                  return n;
-                })
-              }
-            >
-              <div
-                style={{
-                  position: "absolute",
-                  top: 18,
-                  right: 0,
-                  width: 17,
-                  height: 17,
-                  borderRadius: R.sm,
-                  border: `1.5px solid ${selected.has(c.id) ? C.ink : C.border}`,
-                  background: selected.has(c.id) ? C.ink : "transparent",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  transition: "all 0.15s",
-                }}
-              >
-                {selected.has(c.id) && (
-                  <Check size={9} color={C.base} />
-                )}
-              </div>
-              <p
-                style={{
-                  ...T.quoteMain,
-                  marginBottom: 7,
-                  paddingRight: 28,
-                }}
-              >
-                "{c.quote}"
-              </p>
-              <span style={T.book}>{c.book}</span>
-              {c.author && (
-                <span style={{ ...T.author, marginLeft: 8 }}>
-                  {c.author}
-                </span>
-              )}
+            <div style={{ width: 32, height: 32, borderRadius: R.md, background: C.surface, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {downloading ? <Check size={14} color={C.ink} /> : <Download size={14} color={C.muted} />}
             </div>
-          ))}
+            <div>
+              <p style={{ fontSize: 13, fontWeight: 500, color: C.ink, marginBottom: 2 }}>
+                {downloading ? "Downloaded!" : "Download JSON"}
+              </p>
+              <p style={{ fontSize: 11, color: C.faint }}>Full backup with tags & notes</p>
+            </div>
+          </button>
         </div>
-      </div>
-      {selected.size > 0 && (
-        <div
+
+        <button
+          onClick={onClose}
           style={{
-            borderTop: `1px solid ${C.border}`,
-            padding: "14px 28px",
-            flexShrink: 0,
+            marginTop: 16,
+            width: "100%",
+            padding: "8px 0",
+            fontSize: 13,
+            color: C.faint,
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            fontFamily: FONT_SANS,
           }}
         >
-          <div style={{ maxWidth: 660, margin: "0 auto" }}>
-            <p style={{ ...T.label, marginBottom: 7 }}>Preview</p>
-            <pre
-              style={{
-                fontSize: 13,
-                color: C.secondary,
-                fontFamily: FONT_SERIF,
-                lineHeight: 1.8,
-                margin: 0,
-                whiteSpace: "pre-wrap",
-                maxHeight: 68,
-                overflow: "hidden",
-                maskImage:
-                  "linear-gradient(to bottom, black 50%, transparent 100%)",
-              }}
-            >
-              {exportText}
-            </pre>
-          </div>
-        </div>
-      )}
+          Cancel
+        </button>
+      </div>
     </div>
   );
 });
