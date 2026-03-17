@@ -1335,9 +1335,20 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
   useEffect(() => {
     setMessages((msgs) =>
       msgs.map((m) => {
-        if (m.type !== "saved" || !(m as any).card) return m;
-        const live = cards.find((c) => c.id === (m as any).card.id);
-        return { ...m, liveCard: live ?? null };
+        let updated = m;
+        // Sync liveCard for "saved" messages
+        if (m.type === "saved" && (m as any).card) {
+          const live = cards.find((c) => c.id === (m as any).card.id);
+          updated = { ...updated, liveCard: live ?? null };
+        }
+        // Sync snapshot cards in text/synthesis/write/digest messages
+        if (m.cards && m.cards.length > 0) {
+          const synced = m.cards
+            .map((c: any) => cards.find((live) => live.id === c.id))
+            .filter(Boolean);
+          updated = { ...updated, cards: synced };
+        }
+        return updated;
       })
     );
   }, [cards]);
