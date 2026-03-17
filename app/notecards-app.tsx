@@ -21,7 +21,6 @@ import {
   getPlaceholder,
   cleanTag,
   cardToCtx,
-  fmtYear,
   uid,
   Btn,
   TagPickerDrawer,
@@ -33,7 +32,7 @@ import {
   Thinking,
   CommandPalette,
   BookPalette,
-  ThemeBanner,
+  MorningCard,
 } from "./notecards-components";
 
 const NOW = () => Date.now();
@@ -45,12 +44,11 @@ const mkMsg = (role: "user" | "assistant", payload: Record<string, unknown>) => 
 });
 
 const SYSTEM =
-  `You are a thoughtful reading companion helping a user explore their personal notecard library — quotes saved from books they've read. Stay grounded in their actual collection. Surface connections, help them think with their own material. Be concise, warm, specific. Use *asterisks* for emphasis and book titles.`;
+  `You are a thoughtful reading companion helping a user explore their personal notecard library — quotes saved from books they've read. Stay grounded in their actual collection. Help them think with their own material. Be concise, warm, specific. Use *asterisks* for emphasis and book titles.`;
 
 // ─── localStorage keys ─────────────────────────────────────────────────────────
 const STORAGE_KEYS = {
   collections: "nc_collections_v1",
-  themes: "nc_themes_v3",
   dark: "nc_dark_v1",
 };
 
@@ -66,6 +64,7 @@ type NotecardRow = {
   tags: string[] | null;
   note: string | null;
   collection_ids: string[] | null;
+  starred: boolean;
   created_at: string | null;
   last_seen_at: string | null;
 };
@@ -79,6 +78,7 @@ const rowToCard = (row: NotecardRow) => ({
   tags: row.tags ?? [],
   note: row.note ?? "",
   collectionIds: row.collection_ids ?? [],
+  starred: row.starred ?? false,
   createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
   lastSeenAt: row.last_seen_at ? new Date(row.last_seen_at).getTime() : Date.now(),
 });
@@ -93,6 +93,7 @@ const cardToRow = (card: any, userId: string): NotecardRow => ({
   tags: card.tags ?? [],
   note: card.note || null,
   collection_ids: card.collectionIds ?? [],
+  starred: card.starred ?? false,
   created_at: new Date(card.createdAt || Date.now()).toISOString(),
   last_seen_at: new Date(card.lastSeenAt || card.createdAt || Date.now()).toISOString(),
 });
@@ -286,6 +287,7 @@ const DEMO_CARDS = [
     tags: ["stoicism", "obstacles", "mindset"],
     note: "",
     collectionIds: [],
+    starred: false,
     createdAt: NOW() - 864e5 * 10,
     lastSeenAt: undefined,
   },
@@ -299,6 +301,7 @@ const DEMO_CARDS = [
     tags: ["habits", "excellence", "character"],
     note: "Counter to the Stoic emphasis on momentary choice?",
     collectionIds: [],
+    starred: false,
     createdAt: NOW() - 864e5 * 8,
     lastSeenAt: undefined,
   },
@@ -312,6 +315,7 @@ const DEMO_CARDS = [
     tags: ["reading", "life", "imagination"],
     note: "",
     collectionIds: [],
+    starred: false,
     createdAt: NOW() - 864e5 * 5,
     lastSeenAt: undefined,
   },
@@ -324,6 +328,7 @@ const DEMO_CARDS = [
     tags: ["writing", "drafts", "craft"],
     note: "Permission slip for every writer.",
     collectionIds: [],
+    starred: false,
     createdAt: NOW() - 864e5 * 3,
     lastSeenAt: undefined,
   },
@@ -337,33 +342,13 @@ const DEMO_CARDS = [
     tags: ["habits", "systems", "goals"],
     note: "",
     collectionIds: [],
+    starred: false,
     createdAt: NOW() - 864e5,
     lastSeenAt: undefined,
   },
 ];
 
 // ─── AI functions ─────────────────────────────────────────────────────────────
-async function findConnections(newCard: any, existing: any[], signal: AbortSignal) {
-  if (existing.length < 2) return null;
-  const lib = existing.slice(0, 40).map(cardToCtx).join("\n");
-  const prompt = `New card: "${newCard.quote}" — ${newCard.book}${newCard.author ? ` by ${newCard.author}` : ""}\n\nLibrary:\n${lib}\n\nFind 1-2 cards with genuine thematic or philosophical resonance. JSON: {"connections":[{"index":<n>,"observation":"<1-2 sentences>"}]}. Empty array if nothing strong.`;
-  try {
-    const raw = await callClaude(
-      [{ role: "user", content: prompt }],
-      "Return ONLY JSON, no markdown.",
-      signal,
-    );
-    const p = await parseJSON(raw);
-    return (p.connections || [])
-      .map((c: any) => ({
-        card: existing[c.index],
-        observation: c.observation,
-      }))
-      .filter((c: any) => c.card);
-  } catch {
-    return null;
-  }
-}
 
 async function intelligentFind(
   query: string,
@@ -463,33 +448,6 @@ async function smartWrite(topic: string, cards: any[], signal: AbortSignal) {
   };
 }
 
-async function suggestThemes(
-  cards: any[],
-  themes: any[],
-  signal: AbortSignal,
-) {
-  if (cards.length < 4) return null;
-  const existing = themes.map((t: any) => t.name).join(", ") || "none";
-  const prompt = `Library:\n${cards.slice(0, 60).map(cardToCtx).join("\n")}\n\nExisting themes: ${existing}\n\nIdentify 2-4 thematic clusters. JSON: {"themes":[{"name":"<short evocative name>","description":"<1 sentence>","card_indices":[<n>]}]}`;
-  try {
-    const raw = await callClaude(
-      [{ role: "user", content: prompt }],
-      "Return ONLY JSON, no markdown.",
-      signal,
-    );
-    const p = await parseJSON(raw);
-    return (p.themes || []).map((t: any) => ({
-      id: uid(),
-      name: t.name,
-      description: t.description,
-      cardIds: (t.card_indices || []).map((i: number) => cards[i]?.id).filter(Boolean),
-      confirmed: false,
-    }));
-  } catch {
-    return null;
-  }
-}
-
 async function generateDigest(cards: any[], signal: AbortSignal) {
   if (!cards.length) return null;
   const now = NOW();
@@ -520,30 +478,6 @@ async function generateDigest(cards: any[], signal: AbortSignal) {
       framing: "Three cards worth sitting with today.",
     };
   }
-}
-
-async function elaborateCard(
-  card: any,
-  allCards: any[],
-  signal: AbortSignal,
-) {
-  const related = allCards
-    .filter(
-      (c) =>
-        c.id !== card.id &&
-        (c.tags.some((t: string) => card.tags.includes(t)) ||
-          c.author === card.author),
-    )
-    .slice(0, 6);
-  const relCtx = related.length
-    ? `\n\nRelated cards:\n${related.map(cardToCtx).join("\n")}`
-    : "";
-  const prompt = `Quote: "${card.quote}" — *${card.book}*${card.author ? ` by ${card.author}` : ""}${card.year ? ` (${fmtYear(card.year)})` : ""}${relCtx}\n\nWrite a rich 2-3 paragraph elaboration.`;
-  return await callClaude(
-    [{ role: "user", content: prompt }],
-    "You are a brilliant literary scholar. Be specific, surprising, and illuminating.",
-    signal,
-  );
 }
 
 async function suggestReading(cards: any[], signal: AbortSignal) {
@@ -633,34 +567,6 @@ async function generateReadingMode(cards: any[], signal: AbortSignal) {
   }
 }
 
-function computeStats(cards: any[]) {
-  const books = new Set(cards.map((c) => c.book)).size;
-  const authors = new Set(cards.map((c) => c.author).filter(Boolean)).size;
-  const tagCounts: Record<string, number> = {};
-  cards.forEach((c) =>
-    c.tags.forEach((t: string) => {
-      tagCounts[t] = (tagCounts[t] || 0) + 1;
-    }),
-  );
-  const topTags = Object.entries(tagCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5);
-  const thisWeek = cards.filter((c) => NOW() - c.createdAt < 864e5 * 7).length;
-  const annotated = cards.filter((c) => c.note).length;
-  const oldest = cards.length
-    ? cards.reduce((a, b) =>
-        a.year && b.year
-          ? a.year < b.year
-            ? a
-            : b
-          : a.year
-            ? a
-            : b,
-      )
-    : null;
-  return { books, authors, topTags, thisWeek, annotated, oldest };
-}
-
 // ─── App ──────────────────────────────────────────────────────────────────────
 
 type NotecardsAppProps = {
@@ -670,12 +576,10 @@ type NotecardsAppProps = {
 export default function NotecardsApp({ userId }: NotecardsAppProps) {
   const [cards, dispatch] = useReducer(cardsReducer, []);
   const [collections, setCollections] = useState<any[]>([]);
-  const [themes, setThemes] = useState<any[]>([]);
   const [dark, setDark] = useState(false);
   const [storageLoaded, setStorageLoaded] = useState(false);
   const [cardsLoading, setCardsLoading] = useState(true);
 
-  const [pendingThemes, setPendingThemes] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -693,6 +597,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
   const [cmdQuery, setCmdQuery] = useState("");
   const [pastePrompt, setPastePrompt] = useState<string | null>(null);
   const [randomCard, setRandomCard] = useState<any>(null);
+  const [showMorningCard, setShowMorningCard] = useState(false);
   const [savedCardId, setSavedCardId] = useState<string | null>(null);
   const [tagDrawer, setTagDrawer] = useState<any>(null);
 
@@ -705,7 +610,6 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
   const lastShownIds = useRef<string[]>([]);
   const abortRef = useRef<AbortController | null>(null);
   const bookAbortRef = useRef<AbortController | null>(null);
-  const themeTimerRef = useRef<any>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const inputContainerRef = useRef<HTMLDivElement | null>(null);
@@ -724,7 +628,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
   // Initial load: Supabase for cards, localStorage for collections/themes/dark
   useEffect(() => {
     async function load() {
-      const [cardsRes, locCollections, locThemes, locDark] = await Promise.all([
+      const [cardsRes, locCollections, locDark] = await Promise.all([
         supabase
           .from("notecards")
           .select("*")
@@ -732,9 +636,6 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
           .order("created_at", { ascending: false }),
         typeof window !== "undefined"
           ? JSON.parse(localStorage.getItem(STORAGE_KEYS.collections) ?? "null")
-          : null,
-        typeof window !== "undefined"
-          ? JSON.parse(localStorage.getItem(STORAGE_KEYS.themes) ?? "null")
           : null,
         typeof window !== "undefined"
           ? (() => {
@@ -751,7 +652,6 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
         });
       }
       if (Array.isArray(locCollections)) setCollections(locCollections);
-      if (Array.isArray(locThemes)) setThemes(locThemes);
       if (typeof locDark === "boolean") setDark(locDark);
       setStorageLoaded(true);
       setCardsLoading(false);
@@ -759,56 +659,18 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
     load();
   }, [userId]);
 
-  // Welcome-back digest: once when user has cards but no messages (e.g. returning login)
+  // Show morning card when user returns with cards but no messages
   useEffect(() => {
     if (cardsLoading || cards.length === 0 || messages.length > 0 || welcomeDigestTriggeredRef.current) return;
     welcomeDigestTriggeredRef.current = true;
-
-    const runWelcomeDigest = async () => {
-      const count = cards.length;
-      setMessages((p) => [
-        ...p,
-        mkMsg("assistant", {
-          type: "text",
-          text: `Welcome back — your library has ${count} card${count !== 1 ? "s" : ""}. Here's what's worth reading today:`,
-        }),
-      ]);
-      setLoading(true);
-      setLL("curating today's cards…");
-      const ctrl = new AbortController();
-      try {
-        const result = await generateDigest(cards, ctrl.signal);
-        if (result?.cards?.length) {
-          result.cards.forEach((c: { id: string }) => markCardSeen(c.id));
-          setMessages((p) => [...p, mkMsg("assistant", { type: "digest", framing: result.framing, cards: result.cards })]);
-        } else {
-          setMessages((p) => [
-            ...p,
-            mkMsg("assistant", { type: "text", text: "Type / to see what you can do." }),
-          ]);
-        }
-      } catch {
-        setMessages((p) => [
-          ...p,
-          mkMsg("assistant", { type: "text", text: "Type / to see what you can do." }),
-        ]);
-      } finally {
-        setLoading(false);
-        setLL("");
-      }
-    };
-    runWelcomeDigest();
-  }, [cardsLoading, cards.length, messages.length, userId]);
+    setShowMorningCard(true);
+  }, [cardsLoading, cards.length, messages.length]);
 
   // Persist collections, themes, dark to localStorage when storageLoaded
   useEffect(() => {
     if (!storageLoaded || typeof window === "undefined") return;
     localStorage.setItem(STORAGE_KEYS.collections, JSON.stringify(collections));
   }, [storageLoaded, collections]);
-  useEffect(() => {
-    if (!storageLoaded || typeof window === "undefined") return;
-    localStorage.setItem(STORAGE_KEYS.themes, JSON.stringify(themes));
-  }, [storageLoaded, themes]);
   useEffect(() => {
     if (!storageLoaded || typeof window === "undefined") return;
     localStorage.setItem(STORAGE_KEYS.dark, JSON.stringify(dark));
@@ -824,6 +686,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
       if (patch.author !== undefined) up.author = patch.author;
       if (patch.year !== undefined) up.year = patch.year;
       if (patch.note !== undefined) up.note = patch.note;
+      if (patch.starred !== undefined) up.starred = patch.starred;
       if (Object.keys(up).length)
         supabase
           .from("notecards")
@@ -885,13 +748,6 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
   );
 
   const createCollection = useCallback((col: { id: string; name: string; color: string; createdAt?: number }) => setCollections((p) => [...p, col]), []);
-  const confirmTheme = useCallback(
-    (theme: { id: string; name: string; description: string; cardIds: string[]; confirmed?: boolean }) => {
-      setThemes((p) => [...p, { ...theme, confirmed: true }]);
-      setPendingThemes((p) => p.filter((t) => t.id !== theme.id));
-    },
-    []
-  );
 
   const pickRandom = useCallback((pool: any[]) => {
     const now = NOW();
@@ -918,38 +774,6 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
       return n;
     });
   }, [cards, pickRandom, markCardSeen]);
-
-  const dismissConnection = useCallback(
-    (id: string) =>
-      setMessages((p) =>
-        p.map((m) => (m.id === id ? { ...m, connections: [] } : m))
-      ),
-    []
-  );
-
-  const handleElaborate = useCallback(
-    async (card: any) => {
-      setShowLibrary(false);
-      setMessages((p) => [
-        ...p,
-        mkMsg("user", { type: "text", text: `Tell me more about this quote from *${card.book}*` }),
-      ]);
-      setLoading(true);
-      setLL("reading the context…");
-      abortRef.current?.abort();
-      abortRef.current = new AbortController();
-      try {
-        const text = await elaborateCard(card, cardsRef.current, abortRef.current.signal);
-        setMessages((p) => [...p, mkMsg("assistant", { type: "elaborate", card, text })]);
-      } catch (e: any) {
-        if (e?.name !== "AbortError")
-          setMessages((p) => [...p, mkMsg("assistant", { type: "text", text: `Failed: ${e.message}` })]);
-      }
-      setLoading(false);
-      setLL("");
-    },
-    []
-  );
 
   const handleReadingNote = useCallback((cardId: string, note: string) => {
     const card = cardsRef.current.find((c) => c.id === cardId);
@@ -1084,6 +908,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
         tags,
         note: "",
         collectionIds: [],
+        starred: false,
         createdAt: NOW(),
         lastSeenAt: NOW(),
       };
@@ -1092,17 +917,9 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
       if (error) console.error("Supabase insert error:", error);
       setSavedCardId(card.id);
       setTimeout(() => setSavedCardId(null), 800);
-      const existing = cardsRef.current.slice(0, 40);
-      if (existing.length >= 1) {
-        const ctrl = new AbortController();
-        findConnections(card, existing, ctrl.signal).then((conns) => {
-          if (conns?.length)
-            setMessages((p) => p.map((m) => (m.id === pid ? { ...m, connections: conns } : m)));
-        }).catch(() => {});
-      }
       lastShownIds.current = [card.id];
       setMessages((p) =>
-        p.map((m) => (m.id === pid ? { ...m, type: "saved", card, liveCard: card, connections: null } : m))
+        p.map((m) => (m.id === pid ? { ...m, type: "saved", card, liveCard: card } : m))
       );
       setAddCtx(null);
       setTagDrawer(null);
@@ -1126,6 +943,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
       tags: (q.tags ?? []).map((t: string) => cleanTag(t)).filter(Boolean),
       note: "",
       collectionIds: [],
+      starred: false,
       createdAt: NOW(),
       lastSeenAt: NOW(),
     }));
@@ -1221,15 +1039,6 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
 
     if (raw === "/library") {
       setShowLibrary(true);
-      return;
-    }
-    if (raw === "/stats") {
-      setMessages((p) => [...p, mkMsg("user", { type: "text", text: "/stats" })]);
-      if (!sc.length) {
-        setMessages((p) => [...p, mkMsg("assistant", { type: "text", text: "No cards yet!" })]);
-        return;
-      }
-      setMessages((p) => [...p, mkMsg("assistant", { type: "stats", stats: computeStats(sc) })]);
       return;
     }
     if (raw === "/import") {
@@ -1390,34 +1199,19 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
   }, [cards]);
 
   useEffect(() => {
-    if (cards.length > 0 && cards.length % 5 === 0) {
-      if (themeTimerRef.current) clearTimeout(themeTimerRef.current);
-      themeTimerRef.current = setTimeout(async () => {
-        const ctrl = new AbortController();
-        const suggested = await suggestThemes(cards, themes, ctrl.signal);
-        if (suggested?.length) {
-          const novel = suggested.filter((s: { name: string }) => !themes.some((t) => t.name.toLowerCase() === s.name.toLowerCase()));
-          if (novel.length) setPendingThemes(novel);
-        }
-      }, 2000);
-    }
-  }, [cards.length, themes]);
-
-  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
   useEffect(() => {
-    document.body.style.overflow = showLibrary || showExport || !!randomCard ? "hidden" : "";
+    document.body.style.overflow = showLibrary || showExport || !!randomCard || showMorningCard ? "hidden" : "";
     return () => {
       document.body.style.overflow = "";
     };
-  }, [showLibrary, showExport, randomCard]);
+  }, [showLibrary, showExport, randomCard, showMorningCard]);
 
   useEffect(() => () => {
     abortRef.current?.abort();
     bookAbortRef.current?.abort();
-    if (themeTimerRef.current) clearTimeout(themeTimerRef.current);
   }, []);
 
   const showEmpty = !cardsLoading && cards.length === 0 && messages.length === 0;
@@ -1430,10 +1224,9 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
     onDelete: deleteCard,
     onSetCollections: setCardCols,
     onCreateCollection: createCollection,
-    onElaborate: handleElaborate,
     savedCardId,
     inputContainerRef,
-  }), [collections, cards, updateCard, updateTags, deleteCard, setCardCols, createCollection, handleElaborate, savedCardId]);
+  }), [collections, cards, updateCard, updateTags, deleteCard, setCardCols, createCollection, savedCardId]);
 
   return (
     <ThemeCtx.Provider value={C}>
@@ -1498,13 +1291,19 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
             onClose={() => setRandomCard(null)}
           />
         )}
+        {showMorningCard && (
+          <MorningCard
+            cards={cards}
+            onUpdate={updateCard}
+            onDismiss={() => setShowMorningCard(false)}
+          />
+        )}
         {showExport && (
           <ExportPanel cards={cards} onClose={() => setShowExport(false)} />
         )}
         {showLibrary && !showExport && (
           <LibraryPanel
             cards={cards}
-            themes={themes}
             {...msgCardProps}
             onClose={() => setShowLibrary(false)}
             onRandom={() => {
@@ -1541,20 +1340,12 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
               />
             ) : (
               <div style={{ paddingTop: 44 }}>
-                {pendingThemes.length > 0 && (
-                  <ThemeBanner
-                    themes={pendingThemes}
-                    onConfirm={confirmTheme}
-                    onDismissAll={() => setPendingThemes([])}
-                  />
-                )}
                 {messages.map((m) =>
                   (m as any).type === "tagpicker_placeholder" ? null : (
                     <div key={m.id} style={{ animation: "fadeIn 0.25s ease", marginBottom: 36 }}>
                       <MsgBubble
                         m={m as any}
                         {...msgCardProps}
-                        onDismissConnection={dismissConnection}
                         onImportConfirm={handleImportConfirm}
                         onImportDiscard={handleImportDiscard}
                         onReadingNote={handleReadingNote}
