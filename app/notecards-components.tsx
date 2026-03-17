@@ -4660,7 +4660,7 @@ export type Message = {
   label?: string;
 };
 
-export const MsgBubble = memo(function MsgBubble({
+export const MsgBubble = function MsgBubble({
   m,
   collections,
   allCards,
@@ -4715,6 +4715,10 @@ export const MsgBubble = memo(function MsgBubble({
         </span>
       </div>
     );
+  // Resolve snapshot cards to live versions from the reducer
+  const liveCard = (c: CardLike) => allCards.find((a) => a.id === c.id) ?? c;
+  const liveCards = (cs: CardLike[] | undefined) =>
+    (cs ?? []).map(liveCard).filter((c) => allCards.some((a) => a.id === c.id));
   const cardProps = {
     collections,
     onUpdate,
@@ -4727,9 +4731,12 @@ export const MsgBubble = memo(function MsgBubble({
     savedCardId,
     inputContainerRef,
   };
+  const savedLive = m.type === "saved" && (m as any).card
+    ? allCards.find((c) => c.id === (m as any).card.id)
+    : null;
   return (
     <div>
-      {m.type === "saved" && m.liveCard && (
+      {m.type === "saved" && savedLive && (
         <div>
           <div
             style={{
@@ -4738,9 +4745,9 @@ export const MsgBubble = memo(function MsgBubble({
             }}
           >
             <NoteCard
-              card={m.liveCard}
+              card={savedLive}
               {...cardProps}
-              justSaved={m.liveCard?.id === savedCardId}
+              justSaved={savedLive?.id === savedCardId}
             />
           </div>
           <ConnectionNotice
@@ -4752,21 +4759,21 @@ export const MsgBubble = memo(function MsgBubble({
       {m.type === "synthesis" && (
         <SynthesisBlock
           text={m.text ?? ""}
-          cards={m.cards ?? []}
+          cards={liveCards(m.cards)}
           {...cardProps}
         />
       )}
       {m.type === "write" && (
         <WritePrompts
           prompts={m.prompts}
-          cards={m.cards}
+          cards={liveCards(m.cards)}
           {...cardProps}
         />
       )}
       {m.type === "digest" && (
         <DigestBlock
           framing={m.framing ?? ""}
-          cards={m.cards ?? []}
+          cards={liveCards(m.cards)}
           {...cardProps}
         />
       )}
@@ -4774,7 +4781,7 @@ export const MsgBubble = memo(function MsgBubble({
         <RecommendBlock suggestions={m.suggestions} />
       )}
       {m.type === "elaborate" && m.card && (
-        <ElaborateBlock card={m.card} text={m.text ?? ""} />
+        <ElaborateBlock card={liveCard(m.card)} text={m.text ?? ""} />
       )}
       {m.type === "stats" && m.stats && (
         <StatsBlock stats={m.stats} />
@@ -4813,11 +4820,11 @@ export const MsgBubble = memo(function MsgBubble({
             marginTop: 6,
           }}
         >
-          {m.cards.map((c) => (
+          {liveCards(m.cards).map((c) => (
             <NoteCard key={c.id} card={c} {...cardProps} />
           ))}
         </div>
       )}
     </div>
   );
-});
+};
