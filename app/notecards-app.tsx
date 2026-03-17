@@ -8,7 +8,7 @@ import {
   useMemo,
   useReducer,
 } from "react";
-import { Moon, Sun, ArrowUp, X } from "lucide-react";
+import { Moon, Sun, ArrowUp, X, MessageSquare, LayoutGrid } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import {
   ThemeCtx,
@@ -539,7 +539,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
   const [searchingBooks, setSearchingBooks] = useState(false);
   const [selectedBook, setSelectedBook] = useState<any>(null);
   const [authorDraft, setAuthorDraft] = useState("");
-  const [showLibrary, setShowLibrary] = useState(false);
+  const [activeTab, setActiveTab] = useState<"home" | "library">("home");
   const [showExport, setShowExport] = useState(false);
   const [showCmdPalette, setShowCmdPalette] = useState(false);
   const [cmdQuery, setCmdQuery] = useState("");
@@ -703,7 +703,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
     const card = pickRandom(cards);
     markCardSeen(card.id);
     setRandomCard(card);
-    setShowLibrary(false);
+    setActiveTab("home");
   }, [cards, pickRandom, markCardSeen]);
 
   const nextRandom = useCallback(() => {
@@ -1001,7 +1001,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
     const cmd = raw.toLowerCase();
 
     if (raw === "/library") {
-      setShowLibrary(true);
+      setActiveTab("library");
       return;
     }
     if (raw === "/import") {
@@ -1144,11 +1144,11 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
   }, [messages, loading]);
 
   useEffect(() => {
-    document.body.style.overflow = showLibrary || showExport || !!randomCard || showMorningCard ? "hidden" : "";
+    document.body.style.overflow = showExport || !!randomCard ? "hidden" : "";
     return () => {
       document.body.style.overflow = "";
     };
-  }, [showLibrary, showExport, randomCard, showMorningCard]);
+  }, [showExport, randomCard]);
 
   useEffect(() => () => {
     abortRef.current?.abort();
@@ -1170,7 +1170,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
         setTimeout(() => inputRef.current?.focus(), 50);
       } else if (e.key === "l") {
         e.preventDefault();
-        setShowLibrary((v) => !v);
+        setActiveTab((v) => v === "library" ? "home" : "library");
       }
     };
     document.addEventListener("keydown", handler);
@@ -1251,30 +1251,9 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
             onClose={() => setRandomCard(null)}
           />
         )}
-        {showMorningCard && (
-          <MorningCard
-            cards={cards}
-            onUpdate={updateCard}
-            onDismiss={() => setShowMorningCard(false)}
-          />
-        )}
         {showExport && (
           <ExportPanel cards={cards} onClose={() => setShowExport(false)} />
         )}
-        {showLibrary && !showExport && (
-          <LibraryPanel
-            cards={cards}
-            {...msgCardProps}
-            onClose={() => setShowLibrary(false)}
-            onRandom={() => {
-              setShowLibrary(false);
-              openRandom();
-            }}
-            onExport={() => setShowExport(true)}
-            onSmartSearch={(query, signal) => intelligentFind(query, cards, undefined, signal)}
-          />
-        )}
-
         <div
           style={{
             maxWidth: 640,
@@ -1286,6 +1265,61 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
             minHeight: "100vh",
           }}
         >
+          {/* Tab Bar */}
+          {!showEmpty && !cardsLoading && (
+            <div
+              style={{
+                display: "flex",
+                gap: 0,
+                borderBottom: `1px solid ${C.border}`,
+                flexShrink: 0,
+                marginTop: 8,
+              }}
+            >
+              {([
+                { key: "home" as const, icon: <MessageSquare size={14} />, label: "Home" },
+                { key: "library" as const, icon: <LayoutGrid size={14} />, label: "Library" },
+              ]).map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "10px 16px",
+                    fontSize: 12,
+                    fontWeight: activeTab === tab.key ? 500 : 400,
+                    fontFamily: FONT_SANS,
+                    color: activeTab === tab.key ? C.ink : C.faint,
+                    background: "none",
+                    border: "none",
+                    borderBottom: activeTab === tab.key ? `2px solid ${C.ink}` : "2px solid transparent",
+                    cursor: "pointer",
+                    transition: "all 0.15s",
+                    marginBottom: -1,
+                  }}
+                >
+                  {tab.icon}
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {activeTab === "library" && !showEmpty && !cardsLoading ? (
+            <LibraryPanel
+              cards={cards}
+              {...msgCardProps}
+              onClose={() => setActiveTab("home")}
+              onRandom={() => {
+                setActiveTab("home");
+                openRandom();
+              }}
+              onExport={() => setShowExport(true)}
+              onSmartSearch={(query, signal) => intelligentFind(query, cards, undefined, signal)}
+            />
+          ) : (
           <div style={{ flex: 1, paddingBottom: 28 }}>
             {cardsLoading ? (
               <div style={{ display: "flex", minHeight: "82vh", alignItems: "center", justifyContent: "center" }}>
@@ -1300,7 +1334,13 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
                 onDemo={runDemo}
               />
             ) : (
-              <div style={{ paddingTop: 44 }}>
+              <div style={{ paddingTop: 16 }}>
+                {showMorningCard && (
+                  <MorningCard
+                    cards={cards}
+                    onUpdate={updateCard}
+                  />
+                )}
                 {messages.map((m) =>
                   (m as any).type === "tagpicker_placeholder" ? null : (
                     <div key={m.id} style={{ animation: "fadeIn 0.25s ease", marginBottom: 36 }}>
@@ -1319,7 +1359,9 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
               </div>
             )}
           </div>
+          )}
 
+          {activeTab === "home" && (
           <div
             style={{
               position: "sticky",
@@ -1624,6 +1666,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
               </div>
             </div>
           </div>
+          )}
         </div>
         <style>{`@keyframes spin{to{transform:rotate(360deg)}}@keyframes toast-in{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}`}</style>
         {undoToast && (
