@@ -42,7 +42,7 @@ export interface CardLike {
   year?: number | null;
   tags?: string[];
   note?: string;
-  collectionIds?: string[];
+  location?: string;
   starred?: boolean;
   createdAt?: number;
   lastSeenAt?: number;
@@ -99,16 +99,6 @@ export const DARK: Theme = {
 export const ThemeCtx = createContext<Theme>(LIGHT);
 export const useC = () => useContext(ThemeCtx);
 
-export const COLLECTION_COLORS = [
-  "#4a5e3a",
-  "#2563eb",
-  "#7c5c3a",
-  "#8b3a3a",
-  "#3a5c7c",
-  "#5a3a7c",
-  "#3a7c6a",
-  "#0f0f0d",
-];
 export const R = { sm: 5, md: 8, lg: 12, xl: 18, pill: 99 };
 export const FONT_SERIF =
   "'Playfair Display', 'Libre Baskerville', Georgia, serif";
@@ -189,9 +179,9 @@ export const isWarm = (c: CardLike): boolean =>
   NOW() - (c.lastSeenAt ?? c.createdAt ?? 0) < 864e5 * 7;
 
 export const cardToCtx = (c: CardLike, i?: number): string =>
-  `[${i ?? "-"}] "${c.quote}" — *${c.book}*${c.author ? ` by ${c.author}` : ""}${c.year ? ` (${fmtYear(c.year)})` : ""}. Tags: ${(c.tags ?? []).join(", ")}${c.note ? `. Note: ${c.note}` : ""}`;
+  `[${i ?? "-"}] "${c.quote}" — *${c.book}*${c.author ? ` by ${c.author}` : ""}${c.year ? ` (${fmtYear(c.year)})` : ""}${c.location ? ` [${c.location}]` : ""}. Tags: ${(c.tags ?? []).join(", ")}${c.note ? `. Note: ${c.note}` : ""}`;
 export const cardToExport = (c: CardLike): string =>
-  `"${c.quote}"\n— ${c.book}${c.author ? `, ${c.author}` : ""}${c.year ? ` (${fmtYear(c.year)})` : ""}${c.note ? `\n[${c.note}]` : ""}\n`;
+  `"${c.quote}"\n— ${c.book}${c.author ? `, ${c.author}` : ""}${c.year ? ` (${fmtYear(c.year)})` : ""}${c.location ? ` [${c.location}]` : ""}${c.note ? `\n[${c.note}]` : ""}\n`;
 
 const escapeHtml = (s: string): string =>
   s
@@ -250,18 +240,11 @@ export const COMMANDS = [
     icon: "⟳",
   },
   { cmd: "/read", hint: "", desc: "Start a focused reading session", icon: "📖" },
-  { cmd: "/digest", hint: "", desc: "Today's themed cards", icon: "☀" },
   {
     cmd: "/write",
     hint: "topic (optional)",
-    desc: "3 writing prompts from your cards",
+    desc: "Writing prompts from your cards",
     icon: "✐",
-  },
-  {
-    cmd: "/recommend",
-    hint: "",
-    desc: "AI book recommendations",
-    icon: "📚",
   },
   {
     cmd: "/import",
@@ -278,6 +261,8 @@ export function getPlaceholder(
   if (flowStage === "book") return "Search for a book…";
   if (flowStage === "author")
     return "Author name (or press Enter to skip)…";
+  if (flowStage === "location")
+    return "Page, chapter, or location (Enter to skip)…";
   if (flowStage === "import")
     return "Paste quotes, a reading list, or any text with quotes…";
   if (!cards.length) return `/add "a quote that stayed with you"`;
@@ -285,7 +270,7 @@ export function getPlaceholder(
     "Ask a question, or type / for commands…",
     `/find ${cards[0]?.tags?.[0] ?? "stoicism"}`,
     "/read to start a focused session",
-    "/recommend for books you'll love",
+    "/write for writing prompts",
   ];
   return examples[Math.floor(NOW() / 30000) % examples.length];
 }
@@ -1054,30 +1039,21 @@ export const TagEditor = memo(function TagEditor({
   );
 });
 
-type Collection = { id: string; name: string; color: string; createdAt?: number };
-
-
 // ─── CardDetailDrawer ────────────────────────────────────────────────────────
 type CardDetailDrawerProps = {
   card: CardLike;
-  collections: Collection[];
   allCards?: CardLike[];
   onUpdate: (id: string, patch: Partial<CardLike>) => void;
   onTagsChange: (id: string, tags: string[]) => void;
-  onSetCollections: (id: string, ids: string[]) => void;
-  onCreateCollection: (col: Collection) => void;
   onClose: () => void;
   inputContainerRef?: React.RefObject<HTMLDivElement | null>;
 };
 
 const CardDetailDrawer = memo(function CardDetailDrawer({
   card,
-  collections,
   allCards,
   onUpdate,
   onTagsChange,
-  onSetCollections,
-  onCreateCollection,
   onClose,
   inputContainerRef,
 }: CardDetailDrawerProps) {
@@ -1090,15 +1066,12 @@ const CardDetailDrawer = memo(function CardDetailDrawer({
   const [quote, setQuote] = useState(card.quote);
   const [book, setBook] = useState(card.book);
   const [author, setAuthor] = useState(card.author ?? "");
+  const [location, setLocation] = useState(card.location ?? "");
   // Annotation
   const [note, setNote] = useState(card.note ?? "");
   // Tags
   const [selectedTags, setSelectedTags] = useState<string[]>(card.tags ?? []);
   const [tagInput, setTagInput] = useState("");
-  // Collections
-  const [selectedColIds, setSelectedColIds] = useState<Set<string>>(new Set(card.collectionIds ?? []));
-  const [creatingCol, setCreatingCol] = useState(false);
-  const [newColName, setNewColName] = useState("");
   // Evolving reflections
   const [editingReflection, setEditingReflection] = useState(false);
   const [newReflection, setNewReflection] = useState("");
@@ -1107,7 +1080,6 @@ const CardDetailDrawer = memo(function CardDetailDrawer({
 
   const quoteRef = useRef<HTMLTextAreaElement>(null);
   const tagInputRef = useRef<HTMLInputElement>(null);
-  const colInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (inputContainerRef?.current) {
@@ -1123,9 +1095,6 @@ const CardDetailDrawer = memo(function CardDetailDrawer({
     return () => clearTimeout(t);
   }, []);
 
-  useEffect(() => {
-    if (creatingCol) colInputRef.current?.focus();
-  }, [creatingCol]);
 
   const wordCount = note.trim() ? note.trim().split(/\s+/).length : 0;
 
@@ -1143,26 +1112,6 @@ const CardDetailDrawer = memo(function CardDetailDrawer({
     setTagInput("");
     tagInputRef.current?.focus();
   };
-  const toggleCol = (id: string) =>
-    setSelectedColIds((s) => {
-      const n = new Set(s);
-      n.has(id) ? n.delete(id) : n.add(id);
-      return n;
-    });
-  const createCol = () => {
-    const n = newColName.trim();
-    if (!n) return;
-    const col: Collection = {
-      id: uid(),
-      name: n,
-      color: COLLECTION_COLORS[Math.floor(Math.random() * COLLECTION_COLORS.length)] ?? COLLECTION_COLORS[0],
-      createdAt: NOW(),
-    };
-    onCreateCollection(col);
-    setSelectedColIds((s) => new Set([...s, col.id]));
-    setNewColName("");
-    setCreatingCol(false);
-  };
 
   const handleSave = () => {
     const patch: Partial<CardLike> = {};
@@ -1170,13 +1119,11 @@ const CardDetailDrawer = memo(function CardDetailDrawer({
     if (book.trim() !== card.book) patch.book = book.trim();
     if ((author.trim() || "") !== (card.author ?? "")) patch.author = author.trim();
     if (note.trim() !== (card.note ?? "")) patch.note = note.trim();
+    if ((location.trim() || "") !== (card.location ?? "")) patch.location = location.trim();
     if (!quote.trim() || !book.trim()) { onClose(); return; }
     if (Object.keys(patch).length) onUpdate(card.id, patch);
     const origTags = card.tags ?? [];
     if (JSON.stringify(selectedTags) !== JSON.stringify(origTags)) onTagsChange(card.id, selectedTags);
-    const origCols = card.collectionIds ?? [];
-    const newCols = [...selectedColIds];
-    if (JSON.stringify(newCols.sort()) !== JSON.stringify([...origCols].sort())) onSetCollections(card.id, newCols);
     onClose();
   };
 
@@ -1339,6 +1286,25 @@ const CardDetailDrawer = memo(function CardDetailDrawer({
                     }}
                   />
                 </div>
+              </div>
+              <div>
+                <p style={{ ...T.label, marginBottom: 6 }}>Page / Chapter / Location</p>
+                <input
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  placeholder="e.g. p. 42, Ch. 3, Kindle loc. 1204"
+                  style={{
+                    width: "100%",
+                    fontSize: 13,
+                    color: C.muted,
+                    fontFamily: FONT_SANS,
+                    border: `1px solid ${C.border}`,
+                    borderRadius: R.md,
+                    outline: "none",
+                    padding: "10px 14px",
+                    background: "transparent",
+                  }}
+                />
               </div>
             </div>
           )}
@@ -1533,92 +1499,6 @@ const CardDetailDrawer = memo(function CardDetailDrawer({
           )}
           <div style={{ height: 1, background: C.border, opacity: 0.6 }} />
 
-          {/* ── Collections section ── */}
-          {sectionHeader("collections", "Collections", [...selectedColIds].map((id) => collections.find((c) => c.id === id)?.name).filter(Boolean).join(", ") || undefined)}
-          {expandedSection === "collections" && (
-            <div style={{ paddingBottom: 16 }}>
-              {collections.length === 0 && !creatingCol && (
-                <p style={{ ...T.caption, marginBottom: 8 }}>No collections yet.</p>
-              )}
-              {collections.map((col) => {
-                const on = selectedColIds.has(col.id);
-                return (
-                  <button
-                    key={col.id}
-                    onClick={() => toggleCol(col.id)}
-                    style={{
-                      width: "100%",
-                      textAlign: "left",
-                      padding: "10px 0",
-                      background: "transparent",
-                      border: "none",
-                      cursor: "pointer",
-                      fontFamily: FONT_SANS,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      transition: "background 0.1s",
-                    }}
-                  >
-                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: col.color, flexShrink: 0 }} />
-                    <span style={{ fontSize: 13, color: C.ink, flex: 1 }}>{col.name}</span>
-                    {on && <Check size={12} color={C.ink} />}
-                  </button>
-                );
-              })}
-              {creatingCol ? (
-                <div style={{ paddingTop: 8 }}>
-                  <input
-                    ref={colInputRef}
-                    value={newColName}
-                    onChange={(e) => setNewColName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") createCol();
-                      if (e.key === "Escape") { setCreatingCol(false); setNewColName(""); }
-                    }}
-                    placeholder="Collection name…"
-                    style={{
-                      width: "100%",
-                      fontSize: 12,
-                      fontFamily: FONT_SANS,
-                      border: "none",
-                      borderBottom: `1px solid ${C.border}`,
-                      outline: "none",
-                      background: "transparent",
-                      color: C.ink,
-                      paddingBottom: 4,
-                      marginBottom: 8,
-                    }}
-                  />
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <Btn variant="primary" size="xs" onClick={createCol}><Check size={10} /> Create</Btn>
-                    <Btn variant="ghost" size="xs" onClick={() => { setCreatingCol(false); setNewColName(""); }}>Cancel</Btn>
-                  </div>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setCreatingCol(true)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    padding: "10px 0",
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    fontFamily: FONT_SANS,
-                    color: C.faint,
-                    fontSize: 12,
-                    transition: "color 0.15s",
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = C.muted)}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = C.faint)}
-                >
-                  <Plus size={11} /> New collection…
-                </button>
-              )}
-            </div>
-          )}
         </div>
 
         {/* Footer */}
@@ -1646,12 +1526,9 @@ const CardDetailDrawer = memo(function CardDetailDrawer({
 // ─── NoteCard ─────────────────────────────────────────────────────────────────
 type NoteCardProps = {
   card: CardLike;
-  collections: Collection[];
   onUpdate: (id: string, patch: Partial<CardLike>) => void;
   onTagsChange: (id: string, tags: string[]) => void;
   onDelete: (id: string) => void;
-  onSetCollections: (id: string, ids: string[]) => void;
-  onCreateCollection: (col: Collection) => void;
   allCards?: CardLike[];
   compact?: boolean;
   selectable?: boolean;
@@ -1663,12 +1540,9 @@ type NoteCardProps = {
 
 export const NoteCard = memo(function NoteCard({
   card,
-  collections,
   onUpdate,
   onTagsChange,
   onDelete,
-  onSetCollections,
-  onCreateCollection,
   allCards,
   compact = false,
   selectable = false,
@@ -1705,13 +1579,6 @@ export const NoteCard = memo(function NoteCard({
     return () => document.removeEventListener("mousedown", h);
   }, [showMenu]);
 
-  const cardColls = useMemo(
-    () =>
-      (card.collectionIds ?? [])
-        .map((id) => collections.find((c) => c.id === id))
-        .filter(Boolean) as Collection[],
-    [card.collectionIds, collections]
-  );
   const bookCount =
     allCards?.filter(
       (c) =>
@@ -1732,12 +1599,9 @@ export const NoteCard = memo(function NoteCard({
       {showDetail && (
         <CardDetailDrawer
           card={card}
-          collections={collections}
           allCards={allCards}
           onUpdate={onUpdate}
           onTagsChange={onTagsChange}
-          onSetCollections={onSetCollections}
-          onCreateCollection={onCreateCollection}
           onClose={() => setShowDetail(false)}
           inputContainerRef={inputContainerRef}
         />
@@ -1959,6 +1823,7 @@ export const NoteCard = memo(function NoteCard({
           <span style={T.book}>{card.book || "Book"}</span>
           <span style={T.author}>{card.author || "Author"}</span>
           {card.year && <span style={T.meta}>{fmtYear(card.year)}</span>}
+          {card.location && <span style={{ ...T.meta, opacity: 0.6 }}>{card.location}</span>}
           {!selectable && bookCount > 0 && (
             <span style={{ ...T.meta, marginLeft: "auto", fontSize: 10 }}>
               +{bookCount} from this book
@@ -1992,13 +1857,6 @@ export const NoteCard = memo(function NoteCard({
           </div>
         )}
 
-        {!selectable && cardColls.length > 0 && (
-          <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 5 }}>
-            {cardColls.map((col) => (
-              <Chip key={col.id} color={col.color}>{col.name}</Chip>
-            ))}
-          </div>
-        )}
 
         {confirmDelete && (
           <div
@@ -2050,36 +1908,6 @@ export const NoteCard = memo(function NoteCard({
 });
 
 
-// ─── Write mode colours ───────────────────────────────────────────────────────
-export const WRITE_MODES: Record<
-  string,
-  { border: string; bg: string; dbg: string; label: string; dlabel: string; dot: string }
-> = {
-  Argue: {
-    border: "#d4a5a5",
-    bg: "#fdf5f5",
-    dbg: "#2d1515",
-    label: "#7a3a3a",
-    dlabel: "#d4a5a5",
-    dot: "#c07070",
-  },
-  Open: {
-    border: "#a5c4a5",
-    bg: "#f5fdf5",
-    dbg: "#0f2d0f",
-    label: "#3a6a3a",
-    dlabel: "#a5c4a5",
-    dot: "#70a070",
-  },
-  Tension: {
-    border: "#a5afc4",
-    bg: "#f5f6fd",
-    dbg: "#0f102d",
-    label: "#3a4a6a",
-    dlabel: "#a5afc4",
-    dot: "#7080b0",
-  },
-};
 
 // ─── Shared card list ────────────────────────────────────────────────────────
 type CardListProps = Omit<NoteCardProps, "card"> & { cards: CardLike[] };
@@ -2103,7 +1931,6 @@ export const CardList = ({ cards, ...rest }: CardListProps) => {
 
 // ─── Content blocks ───────────────────────────────────────────────────────────
 type WritePrompt = {
-  mode: string;
   label: string;
   prompt: string;
 };
@@ -2118,7 +1945,6 @@ export const WritePrompts = memo(function WritePrompts({
   const C = useC();
   const T = makeT(C);
   const [show, setShow] = useState(false);
-  const isDark = C === DARK;
   if (!prompts?.length) return null;
   return (
     <div>
@@ -2130,76 +1956,40 @@ export const WritePrompts = memo(function WritePrompts({
           marginBottom: 14,
         }}
       >
-        {prompts.map((p, i) => {
-          const m =
-            WRITE_MODES[p.mode] ?? {
-              border: C.border,
-              bg: C.surface,
-              label: C.muted,
-              dot: C.faint,
-              dbg: C.surface,
-              dlabel: C.faint,
-            };
-          return (
-            <div
-              key={i}
+        {prompts.map((p, i) => (
+          <div
+            key={i}
+            style={{
+              borderRadius: R.lg,
+              border: `1px solid ${C.border}`,
+              background: C.surface,
+              padding: "14px 16px",
+            }}
+          >
+            <span
               style={{
-                borderRadius: R.lg,
-                border: `1px solid ${m.border}`,
-                background: isDark ? m.dbg : m.bg,
-                padding: "14px 16px",
+                fontSize: 11,
+                fontWeight: 600,
+                color: C.muted,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                display: "block",
+                marginBottom: 7,
               }}
             >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  marginBottom: 7,
-                }}
-              >
-                <div
-                  style={{
-                    width: 5,
-                    height: 5,
-                    borderRadius: "50%",
-                    background: m.dot,
-                    flexShrink: 0,
-                  }}
-                />
-                <span
-                  style={{
-                    fontSize: 10,
-                    fontWeight: 600,
-                    color: isDark ? m.dlabel : m.label,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.1em",
-                  }}
-                >
-                  {p.mode}
-                </span>
-                <span
-                  style={{
-                    fontSize: 10,
-                    color: isDark ? m.dlabel : m.label,
-                    opacity: 0.6,
-                  }}
-                >
-                  — {p.label}
-                </span>
-              </div>
-              <p
-                style={{
-                  ...T.body,
-                  margin: 0,
-                  color: C.ink,
-                  fontSize: 14,
-                }}
-                dangerouslySetInnerHTML={renderText(p.prompt, C)}
-              />
-            </div>
-          );
-        })}
+              {p.label}
+            </span>
+            <p
+              style={{
+                ...T.body,
+                margin: 0,
+                color: C.ink,
+                fontSize: 14,
+              }}
+              dangerouslySetInnerHTML={renderText(p.prompt, C)}
+            />
+          </div>
+        ))}
       </div>
       {cards && cards.length > 0 && (
         <>
@@ -2265,125 +2055,6 @@ export const SynthesisBlock = memo(function SynthesisBlock({
     </div>
   );
 });
-
-export const DigestBlock = memo(function DigestBlock({
-  framing,
-  cards,
-  ...rest
-}: {
-  framing: string;
-  cards: CardLike[];
-} & Omit<NoteCardProps, "card" | "compact">) {
-  const C = useC();
-  const T = makeT(C);
-  return (
-    <div>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "flex-start",
-          gap: 10,
-          marginBottom: 20,
-        }}
-      >
-        <span style={{ fontSize: 15, lineHeight: 1 }}>☀</span>
-        <p style={{ ...T.quoteDisplay, fontSize: 17, margin: 0 }}>
-          {framing}
-        </p>
-      </div>
-      <div
-        style={{
-          borderLeft: `1px solid ${C.border}`,
-          paddingLeft: 20,
-        }}
-      >
-        {cards.map((c) => (
-          <NoteCard key={c.id} card={c} {...rest} />
-        ))}
-      </div>
-    </div>
-  );
-});
-
-type Suggestion = {
-  title: string;
-  author: string;
-  year?: number | null;
-  why: string;
-};
-export const RecommendBlock = memo(function RecommendBlock({
-  suggestions,
-}: {
-  suggestions?: Suggestion[];
-}) {
-  const C = useC();
-  const T = makeT(C);
-  if (!suggestions?.length)
-    return <p style={T.body}>Couldn't generate recommendations.</p>;
-  return (
-    <div>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          marginBottom: 18,
-        }}
-      >
-        <span style={{ fontSize: 15 }}>📚</span>
-        <p style={{ ...T.body, margin: 0 }}>
-          Books your library is pointing toward:
-        </p>
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-        {suggestions.map((s, i) => (
-          <div
-            key={i}
-            style={{
-              padding: "16px 0",
-              borderBottom: `1px solid ${C.border}`,
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "baseline",
-                gap: 8,
-                marginBottom: 6,
-              }}
-            >
-              <span
-                style={{
-                  ...T.quoteDisplay,
-                  fontSize: 15,
-                  fontWeight: "normal",
-                }}
-              >
-                {s.title}
-              </span>
-              <span style={T.author}>{s.author}</span>
-              {s.year != null && (
-                <span style={T.meta}>{s.year}</span>
-              )}
-            </div>
-            <p
-              style={{
-                ...T.body,
-                fontSize: 14,
-                margin: 0,
-                color: C.muted,
-                lineHeight: 1.7,
-              }}
-            >
-              {s.why}
-            </p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-});
-
 
 type ImportQuote = {
   quote: string;
@@ -3079,14 +2750,12 @@ export function CommandPalette({
 type Filter = { id: string; type: string; value: string };
 export const FilterBar = memo(function FilterBar({
   filters,
-  collections,
   tags,
   onAdd,
   onRemove,
   onClearAll,
 }: {
   filters: Filter[];
-  collections: Collection[];
   tags: { tag: string; count: number }[];
   onAdd: (f: Filter) => void;
   onRemove: (id: string) => void;
@@ -3114,7 +2783,6 @@ export const FilterBar = memo(function FilterBar({
 
   const typeOptions = [
     tags.length && { type: "tag", label: "Tag" },
-    collections.length && { type: "coll", label: "Collection" },
     { type: "starred", label: "Starred" },
   ].filter(Boolean) as { type: string; label: string }[];
 
@@ -3132,28 +2800,11 @@ export const FilterBar = memo(function FilterBar({
           dot: undefined,
         }))
         .filter((o) => !active.has(o.value));
-    if (step.type === "coll")
-      return collections
-        .map((col) => ({
-          value: col.id,
-          label: col.name,
-          dot: col.color,
-          meta: undefined,
-        }))
-        .filter((o) => !active.has(o.value));
     return [];
-  }, [step, filters, tags, collections]);
+  }, [step, filters, tags]);
 
   const resolveLabel = (f: Filter) => {
     if (f.type === "tag") return { label: f.value, dot: undefined, typeLabel: "Tag" };
-    if (f.type === "coll") {
-      const c = collections.find((c) => c.id === f.value);
-      return {
-        label: c?.name ?? f.value,
-        dot: c?.color,
-        typeLabel: "Collection",
-      };
-    }
     if (f.type === "starred") return { label: "Yes", dot: undefined, typeLabel: "Starred" };
     return { label: f.value, dot: undefined, typeLabel: "" };
   };
@@ -4452,15 +4103,13 @@ export const MorningCard = memo(function MorningCard({
 
 export const LibraryPanel = memo(function LibraryPanel({
   cards,
-  collections,
   onUpdate,
   onTagsChange,
   onDelete,
-  onSetCollections,
-  onCreateCollection,
   onClose,
   onRandom,
   onExport,
+  onSmartSearch,
   allCards,
   inputContainerRef,
 }: Omit<NoteCardProps, "card"> & {
@@ -4468,12 +4117,17 @@ export const LibraryPanel = memo(function LibraryPanel({
   onClose: () => void;
   onRandom: () => void;
   onExport: () => void;
+  onSmartSearch?: (query: string, signal: AbortSignal) => Promise<{ type: string; text: string; cards: CardLike[] }>;
   allCards?: CardLike[];
 }) {
   const C = useC();
   const T = makeT(C);
   const [filters, setFilters] = useState<Filter[]>([]);
   const [search, setSearch] = useState("");
+  const [smartMode, setSmartMode] = useState(false);
+  const [smartResults, setSmartResults] = useState<CardLike[] | null>(null);
+  const [smartSearching, setSmartSearching] = useState(false);
+  const smartAbortRef = useRef<AbortController | null>(null);
   const [viewMode, setViewMode] = useState<"book" | "all">("book");
   const scrollRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -4482,6 +4136,34 @@ export const LibraryPanel = memo(function LibraryPanel({
   useEffect(() => {
     setTimeout(() => searchRef.current?.focus(), 100);
   }, []);
+
+  // Smart search effect
+  useEffect(() => {
+    if (!smartMode || !search.trim() || !onSmartSearch) {
+      setSmartResults(null);
+      setSmartSearching(false);
+      return;
+    }
+    smartAbortRef.current?.abort();
+    const ctrl = new AbortController();
+    smartAbortRef.current = ctrl;
+    setSmartSearching(true);
+    const t = setTimeout(async () => {
+      try {
+        const res = await onSmartSearch(search.trim(), ctrl.signal);
+        if (!ctrl.signal.aborted) {
+          setSmartResults(res.cards);
+          setSmartSearching(false);
+        }
+      } catch {
+        if (!ctrl.signal.aborted) {
+          setSmartResults(null);
+          setSmartSearching(false);
+        }
+      }
+    }, 500);
+    return () => { clearTimeout(t); ctrl.abort(); };
+  }, [smartMode, search, onSmartSearch]);
 
   const tags = useMemo(
     () =>
@@ -4492,18 +4174,15 @@ export const LibraryPanel = memo(function LibraryPanel({
     [cards]
   );
   const visible = useMemo(() => {
+    if (smartMode && smartResults) return smartResults;
     let r = cards;
     for (const f of filters) {
       if (f.type === "tag")
         r = r.filter((c) => (c.tags ?? []).includes(f.value));
-      if (f.type === "coll")
-        r = r.filter((c) =>
-          (c.collectionIds ?? []).includes(f.value)
-        );
       if (f.type === "starred")
         r = r.filter((c) => c.starred === true);
     }
-    if (search.trim()) {
+    if (search.trim() && !smartMode) {
       const q = search.trim().toLowerCase();
       r = r.filter(
         (c) =>
@@ -4515,7 +4194,7 @@ export const LibraryPanel = memo(function LibraryPanel({
       );
     }
     return r;
-  }, [cards, filters, search]);
+  }, [cards, filters, search, smartMode, smartResults]);
 
   const bookGroups = useMemo(
     () =>
@@ -4531,14 +4210,12 @@ export const LibraryPanel = memo(function LibraryPanel({
     [visible]
   );
   const starredCount = useMemo(() => cards.filter((c) => c.starred).length, [cards]);
+  const bookCount = useMemo(() => new Set(cards.map((c) => c.book.toLowerCase())).size, [cards]);
   const hasFilters = filters.length > 0 || search.trim().length > 0;
   const cardProps = {
-    collections,
     onUpdate,
     onTagsChange,
     onDelete,
-    onSetCollections,
-    onCreateCollection,
     allCards: allCards ?? cards,
     inputContainerRef,
   };
@@ -4590,8 +4267,9 @@ export const LibraryPanel = memo(function LibraryPanel({
                 {visible.length}
                 {hasFilters ? ` of ${cards.length}` : ""} card
                 {visible.length !== 1 ? "s" : ""}
+                {" "}· {bookCount} book{bookCount !== 1 ? "s" : ""}
                 {starredCount > 0 && (
-                  <span style={{ color: C.warmDot, marginLeft: 2 }}>
+                  <span style={{ color: C.warmDot }}>
                     {" "}· {starredCount} starred
                   </span>
                 )}
@@ -4664,7 +4342,7 @@ export const LibraryPanel = memo(function LibraryPanel({
               ref={searchRef}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search…"
+              placeholder={smartMode ? "Smart search…" : "Search…"}
               style={{
                 width: "100%",
                 padding: "7px 28px 7px 30px",
@@ -4699,6 +4377,27 @@ export const LibraryPanel = memo(function LibraryPanel({
               </button>
             )}
           </div>
+          {onSmartSearch && (
+            <button
+              onClick={() => { setSmartMode((v) => !v); setSmartResults(null); }}
+              title={smartMode ? "Switch to text search" : "Switch to AI search"}
+              style={{
+                background: smartMode ? C.surfaceAlt : "transparent",
+                border: `1px solid ${smartMode ? C.ink : C.border}`,
+                borderRadius: R.md,
+                padding: "5px 10px",
+                cursor: "pointer",
+                fontFamily: FONT_SANS,
+                fontSize: 11,
+                color: smartMode ? C.ink : C.muted,
+                flexShrink: 0,
+                fontWeight: smartMode ? 600 : 400,
+                transition: "all 0.15s",
+              }}
+            >
+              {smartSearching ? "…" : "AI"}
+            </button>
+          )}
           <div
             style={{
               width: 1,
@@ -4709,7 +4408,6 @@ export const LibraryPanel = memo(function LibraryPanel({
           />
           <FilterBar
             filters={filters}
-            collections={collections}
             tags={tags}
             onAdd={(f) => {
               setFilters((p) => [...p, f]);
@@ -5049,8 +4747,6 @@ export type Message = {
   liveCard?: CardLike | null;
   prompts?: WritePrompt[];
   cards?: CardLike[];
-  framing?: string;
-  suggestions?: Suggestion[];
   session?: ReadingSession;
   quotes?: ImportQuote[];
   label?: string;
@@ -5058,13 +4754,10 @@ export type Message = {
 
 export const MsgBubble = function MsgBubble({
   m,
-  collections,
   allCards,
   onUpdate,
   onTagsChange,
   onDelete,
-  onSetCollections,
-  onCreateCollection,
   onImportConfirm,
   onImportDiscard,
   onReadingNote,
@@ -5072,13 +4765,10 @@ export const MsgBubble = function MsgBubble({
   inputContainerRef,
 }: {
   m: Message;
-  collections: Collection[];
   allCards: CardLike[];
   onUpdate: (id: string, patch: Partial<CardLike>) => void;
   onTagsChange: (id: string, tags: string[]) => void;
   onDelete: (id: string) => void;
-  onSetCollections: (id: string, ids: string[]) => void;
-  onCreateCollection: (col: Collection) => void;
   onImportConfirm: (id: string, quotes: ImportQuote[]) => void;
   onImportDiscard: (id: string) => void;
   onReadingNote?: (cardId: string, note: string) => void;
@@ -5112,12 +4802,9 @@ export const MsgBubble = function MsgBubble({
   const liveCards = (cs: CardLike[] | undefined) =>
     (cs ?? []).map(liveCard).filter((c) => allCards.some((a) => a.id === c.id));
   const cardProps = {
-    collections,
     onUpdate,
     onTagsChange,
     onDelete,
-    onSetCollections,
-    onCreateCollection,
     allCards,
     savedCardId,
     inputContainerRef,
@@ -5156,16 +4843,6 @@ export const MsgBubble = function MsgBubble({
           cards={liveCards(m.cards)}
           {...cardProps}
         />
-      )}
-      {m.type === "digest" && (
-        <DigestBlock
-          framing={m.framing ?? ""}
-          cards={liveCards(m.cards)}
-          {...cardProps}
-        />
-      )}
-      {m.type === "recommend" && (
-        <RecommendBlock suggestions={m.suggestions} />
       )}
       {m.type === "reading" && m.session && (
         <ReadingSessionBlock
