@@ -4219,18 +4219,7 @@ export const LibraryPanel = memo(function LibraryPanel({
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span
-                style={{
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: C.ink,
-                  letterSpacing: "-0.01em",
-                  fontFamily: FONT_SANS,
-                }}
-              >
-                Library
-              </span>
-              <span style={{ ...T.caption, color: C.faint, marginLeft: 2 }}>
+              <span style={{ ...T.caption, color: C.faint }}>
                 {visible.length}
                 {hasFilters ? ` of ${cards.length}` : ""} card{visible.length !== 1 ? "s" : ""}
                 {" "}· {bookCount} book{bookCount !== 1 ? "s" : ""}
