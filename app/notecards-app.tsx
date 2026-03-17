@@ -703,7 +703,6 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
     const card = pickRandom(cards);
     markCardSeen(card.id);
     setRandomCard(card);
-    setActiveTab("home");
   }, [cards, pickRandom, markCardSeen]);
 
   const nextRandom = useCallback(() => {
@@ -1274,6 +1273,10 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
                 borderBottom: `1px solid ${C.border}`,
                 flexShrink: 0,
                 marginTop: 8,
+                position: "sticky",
+                top: 0,
+                background: C.base,
+                zIndex: 20,
               }}
             >
               {([
@@ -1312,10 +1315,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
               cards={cards}
               {...msgCardProps}
               onClose={() => setActiveTab("home")}
-              onRandom={() => {
-                setActiveTab("home");
-                openRandom();
-              }}
+              onRandom={openRandom}
               onExport={() => setShowExport(true)}
               onSmartSearch={(query, signal) => intelligentFind(query, cards, undefined, signal)}
             />
