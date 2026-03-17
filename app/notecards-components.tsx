@@ -264,12 +264,6 @@ export const COMMANDS = [
     desc: "Bulk import quotes from text",
     icon: "⬆",
   },
-  {
-    cmd: "/stats",
-    hint: "",
-    desc: "Library statistics & insights",
-    icon: "◉",
-  },
 ];
 
 export function getPlaceholder(
@@ -1545,7 +1539,6 @@ type NoteCardProps = {
   onDelete: (id: string) => void;
   onSetCollections: (id: string, ids: string[]) => void;
   onCreateCollection: (col: Collection) => void;
-  onElaborate?: (card: CardLike) => void;
   allCards?: CardLike[];
   compact?: boolean;
   selectable?: boolean;
@@ -1563,7 +1556,6 @@ export const NoteCard = memo(function NoteCard({
   onDelete,
   onSetCollections,
   onCreateCollection,
-  onElaborate,
   allCards,
   compact = false,
   selectable = false,
@@ -1707,34 +1699,6 @@ export const NoteCard = memo(function NoteCard({
                   animation: "fadeIn 0.12s ease",
                 }}
               >
-                {onElaborate && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowMenu(false);
-                      onElaborate(card);
-                    }}
-                    style={{
-                      width: "100%",
-                      textAlign: "left",
-                      padding: "10px 16px",
-                      background: "transparent",
-                      border: "none",
-                      cursor: "pointer",
-                      fontSize: 13,
-                      fontFamily: FONT_SANS,
-                      color: C.secondary,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = C.surface)}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                  >
-                    <Sparkles size={12} /> Elaborate
-                  </button>
-                )}
                 <button
                   type="button"
                   onClick={(e) => {
@@ -1748,7 +1712,6 @@ export const NoteCard = memo(function NoteCard({
                     padding: "10px 16px",
                     background: "transparent",
                     border: "none",
-                    borderTop: onElaborate ? `1px solid ${C.border}` : undefined,
                     cursor: "pointer",
                     fontSize: 13,
                     fontFamily: FONT_SANS,
@@ -1909,121 +1872,6 @@ export const NoteCard = memo(function NoteCard({
   );
 });
 
-// ─── Connection notice ────────────────────────────────────────────────────────
-type Connection = { card: CardLike; observation: string };
-export const ConnectionNotice = memo(function ConnectionNotice({
-  connections,
-  onDismiss,
-}: {
-  connections?: Connection[] | null;
-  onDismiss: () => void;
-}) {
-  const C = useC();
-  const T = makeT(C);
-  const [expanded, setExpanded] = useState(false);
-  if (!connections?.length) return null;
-  return (
-    <div
-      style={{
-        marginTop: 14,
-        borderRadius: R.lg,
-        background: C.sageBg,
-        border: `1px solid ${C.sageBorder}`,
-        overflow: "hidden",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "10px 16px",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <Sparkles size={11} style={{ color: C.sage }} />
-          <span
-            style={{
-              fontSize: 12,
-              color: C.sage,
-              fontWeight: 500,
-              letterSpacing: "0.02em",
-            }}
-          >
-            Echoes something in your library
-          </span>
-        </div>
-        <div style={{ display: "flex", gap: 4 }}>
-          <Btn
-            variant="ghost"
-            size="xs"
-            onClick={() => setExpanded((v) => !v)}
-            style={{ color: C.sage }}
-          >
-            {expanded ? "Less" : "See"}
-          </Btn>
-          <button
-            onClick={onDismiss}
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              color: C.sage,
-              display: "inline-flex",
-              padding: 2,
-            }}
-          >
-            <X size={12} />
-          </button>
-        </div>
-      </div>
-      {expanded &&
-        connections.map((cn, i) => (
-          <div
-            key={i}
-            style={{
-              padding: "12px 16px",
-              borderTop: `1px solid ${C.sageBorder}`,
-            }}
-          >
-            <p
-              style={{
-                fontSize: 13,
-                color: C.sage,
-                marginBottom: 10,
-                lineHeight: 1.65,
-              }}
-            >
-              {cn.observation}
-            </p>
-            <div
-              style={{
-                background: "rgba(0,0,0,0.03)",
-                borderRadius: R.md,
-                padding: "10px 14px",
-              }}
-            >
-              <p
-                style={{
-                  ...T.quoteMain,
-                  fontSize: 14,
-                  marginBottom: 5,
-                }}
-              >
-                "{cn.card.quote}"
-              </p>
-              <span style={T.book}>{cn.card.book}</span>
-              {cn.card.author && (
-                <span style={{ ...T.author, marginLeft: 6 }}>
-                  {cn.card.author}
-                </span>
-              )}
-            </div>
-          </div>
-        ))}
-    </div>
-  );
-});
 
 // ─── Write mode colours ───────────────────────────────────────────────────────
 export const WRITE_MODES: Record<
@@ -2359,177 +2207,6 @@ export const RecommendBlock = memo(function RecommendBlock({
   );
 });
 
-export const ElaborateBlock = memo(function ElaborateBlock({
-  card,
-  text,
-}: {
-  card: CardLike;
-  text: string;
-}) {
-  const C = useC();
-  const T = makeT(C);
-  return (
-    <div>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          marginBottom: 14,
-        }}
-      >
-        <Sparkles size={12} style={{ color: C.faint }} />
-        <span style={T.label}>On this quote</span>
-      </div>
-      <div
-        style={{
-          borderLeft: `2px solid ${C.border}`,
-          paddingLeft: 16,
-          marginBottom: 16,
-        }}
-      >
-        <p
-          style={{
-            ...T.quoteMain,
-            fontSize: 15,
-            marginBottom: 6,
-          }}
-        >
-          "{card.quote}"
-        </p>
-        <span style={T.book}>{card.book}</span>
-        {card.author && (
-          <span style={{ ...T.author, marginLeft: 8 }}>{card.author}</span>
-        )}
-      </div>
-      <p
-        style={{
-          ...T.body,
-          whiteSpace: "pre-wrap",
-          lineHeight: 1.85,
-        }}
-        dangerouslySetInnerHTML={renderText(text, C)}
-      />
-    </div>
-  );
-});
-
-type Stats = {
-  books: number;
-  authors: number;
-  topTags: [string, number][];
-  thisWeek: number;
-  annotated: number;
-  oldest: CardLike | null;
-};
-export const StatsBlock = memo(function StatsBlock({
-  stats,
-}: {
-  stats: Stats;
-}) {
-  const C = useC();
-  const T = makeT(C);
-  const {
-    books,
-    authors,
-    topTags,
-    thisWeek,
-    annotated,
-    oldest,
-  } = stats;
-  return (
-    <div>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          marginBottom: 18,
-        }}
-      >
-        <span style={{ fontSize: 13 }}>◉</span>
-        <span style={T.label}>Library snapshot</span>
-      </div>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: 8,
-          marginBottom: 18,
-        }}
-      >
-        {[
-          { label: "Books", value: books },
-          { label: "Authors", value: authors },
-          { label: "Annotated", value: annotated },
-          { label: "This week", value: thisWeek },
-        ].map(({ label, value }) => (
-          <div
-            key={label}
-            style={{
-              padding: "14px 16px",
-              borderRadius: R.lg,
-              border: `1px solid ${C.border}`,
-              background: C.surface,
-            }}
-          >
-            <p
-              style={{
-                fontSize: 24,
-                fontWeight: 600,
-                color: C.ink,
-                fontFamily: FONT_SANS,
-                marginBottom: 3,
-                letterSpacing: "-0.02em",
-              }}
-            >
-              {value}
-            </p>
-            <p style={{ ...T.caption, margin: 0 }}>{label}</p>
-          </div>
-        ))}
-      </div>
-      {topTags.length > 0 && (
-        <div style={{ marginBottom: 14 }}>
-          <p style={{ ...T.label, marginBottom: 10 }}>Top tags</p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-            {topTags.map(([tag, count]) => (
-              <span
-                key={tag}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 5,
-                  fontSize: 13,
-                  fontFamily: FONT_SANS,
-                  color: C.secondary,
-                }}
-              >
-                <span
-                  style={{
-                    width: 3,
-                    height: 3,
-                    borderRadius: "50%",
-                    background: C.faint,
-                  }}
-                />
-                {tag}
-                <span style={{ color: C.faint, fontSize: 11 }}>{count}</span>
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-      {oldest?.year != null && (
-        <p style={{ ...T.caption, marginTop: 8 }}>
-          Oldest source: <em>{oldest.book}</em>
-          {oldest.author ? ` by ${oldest.author}` : ""} (
-          {fmtYear(oldest.year)})
-        </p>
-      )}
-    </div>
-  );
-});
 
 type ImportQuote = {
   quote: string;
@@ -2947,133 +2624,6 @@ export const ReadingSessionBlock = memo(function ReadingSessionBlock({
   );
 });
 
-type ThemeItem = {
-  id: string;
-  name: string;
-  description: string;
-  cardIds: string[];
-  confirmed?: boolean;
-};
-export const ThemeBanner = memo(function ThemeBanner({
-  themes,
-  onConfirm,
-  onDismissAll,
-}: {
-  themes: ThemeItem[];
-  onConfirm: (theme: ThemeItem) => void;
-  onDismissAll: () => void;
-}) {
-  const C = useC();
-  const T = makeT(C);
-  const [idx, setIdx] = useState(0);
-  if (!themes.length) return null;
-  const t = themes[idx];
-  return (
-    <div
-      style={{
-        marginBottom: 24,
-        borderRadius: R.lg,
-        background: C.sageBg,
-        border: `1px solid ${C.sageBorder}`,
-        padding: "14px 18px",
-        animation: "fadeIn 0.2s ease",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-          gap: 10,
-        }}
-      >
-        <div style={{ flex: 1 }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              marginBottom: 5,
-            }}
-          >
-            <Sparkles size={10} style={{ color: C.sage }} />
-            <span
-              style={{
-                ...T.label,
-                fontSize: 9,
-                color: C.sage,
-              }}
-            >
-              Theme detected
-              {themes.length > 1 ? ` (${idx + 1}/${themes.length})` : ""}
-            </span>
-          </div>
-          <p
-            style={{
-              fontSize: 13,
-              color: C.sage,
-              fontWeight: 600,
-              marginBottom: 2,
-              fontFamily: FONT_SANS,
-            }}
-          >
-            "{t.name}"
-          </p>
-          <p
-            style={{
-              ...T.caption,
-              color: C.sage,
-              opacity: 0.8,
-            }}
-          >
-            {t.description} · {t.cardIds.length} card
-            {t.cardIds.length !== 1 ? "s" : ""}
-          </p>
-        </div>
-        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-          <Btn
-            size="xs"
-            variant="ghost"
-            style={{
-              color: C.sage,
-              border: `1px solid ${C.sageBorder}`,
-            }}
-            onClick={() => {
-              onConfirm(t);
-              if (idx >= themes.length - 1)
-                setIdx(Math.max(0, idx - 1));
-            }}
-          >
-            <Check size={10} /> Add
-          </Btn>
-          {themes.length > 1 && (
-            <Btn
-              size="xs"
-              variant="ghost"
-              style={{ color: C.sage }}
-              onClick={() => setIdx((i) => (i + 1) % themes.length)}
-            >
-              Next
-            </Btn>
-          )}
-          <button
-            onClick={onDismissAll}
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              color: C.sage,
-              display: "inline-flex",
-              padding: 2,
-            }}
-          >
-            <X size={12} />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-});
 
 type BookSuggestion = {
   title: string;
@@ -3353,7 +2903,6 @@ type Filter = { id: string; type: string; value: string };
 export const FilterBar = memo(function FilterBar({
   filters,
   collections,
-  themes,
   tags,
   onAdd,
   onRemove,
@@ -3361,7 +2910,6 @@ export const FilterBar = memo(function FilterBar({
 }: {
   filters: Filter[];
   collections: Collection[];
-  themes: ThemeItem[];
   tags: { tag: string; count: number }[];
   onAdd: (f: Filter) => void;
   onRemove: (id: string) => void;
@@ -3390,7 +2938,6 @@ export const FilterBar = memo(function FilterBar({
   const typeOptions = [
     tags.length && { type: "tag", label: "Tag" },
     collections.length && { type: "coll", label: "Collection" },
-    themes.length && { type: "theme", label: "Theme" },
   ].filter(Boolean) as { type: string; label: string }[];
 
   const valueOptions = useMemo(() => {
@@ -3416,17 +2963,8 @@ export const FilterBar = memo(function FilterBar({
           meta: undefined,
         }))
         .filter((o) => !active.has(o.value));
-    if (step.type === "theme")
-      return themes
-        .map((t) => ({
-          value: t.id,
-          label: t.name,
-          dot: undefined,
-          meta: undefined,
-        }))
-        .filter((o) => !active.has(o.value));
     return [];
-  }, [step, filters, tags, collections, themes]);
+  }, [step, filters, tags, collections]);
 
   const resolveLabel = (f: Filter) => {
     if (f.type === "tag") return { label: f.value, dot: undefined, typeLabel: "Tag" };
@@ -3436,14 +2974,6 @@ export const FilterBar = memo(function FilterBar({
         label: c?.name ?? f.value,
         dot: c?.color,
         typeLabel: "Collection",
-      };
-    }
-    if (f.type === "theme") {
-      const t = themes.find((t) => t.id === f.value);
-      return {
-        label: t?.name ?? f.value,
-        dot: undefined,
-        typeLabel: "Theme",
       };
     }
     return { label: f.value, dot: undefined, typeLabel: "" };
@@ -3943,14 +3473,12 @@ export const RandomCard = memo(function RandomCard({
 
 export const LibraryPanel = memo(function LibraryPanel({
   cards,
-  themes,
   collections,
   onUpdate,
   onTagsChange,
   onDelete,
   onSetCollections,
   onCreateCollection,
-  onElaborate,
   onClose,
   onRandom,
   onExport,
@@ -3958,7 +3486,6 @@ export const LibraryPanel = memo(function LibraryPanel({
   inputContainerRef,
 }: Omit<NoteCardProps, "card"> & {
   cards: CardLike[];
-  themes: ThemeItem[];
   onClose: () => void;
   onRandom: () => void;
   onExport: () => void;
@@ -3993,10 +3520,6 @@ export const LibraryPanel = memo(function LibraryPanel({
         r = r.filter((c) =>
           (c.collectionIds ?? []).includes(f.value)
         );
-      if (f.type === "theme") {
-        const t = themes.find((t) => t.id === f.value);
-        r = r.filter((c) => t?.cardIds.includes(c.id));
-      }
     }
     if (search.trim()) {
       const q = search.trim().toLowerCase();
@@ -4010,7 +3533,7 @@ export const LibraryPanel = memo(function LibraryPanel({
       );
     }
     return r;
-  }, [cards, filters, themes, search]);
+  }, [cards, filters, search]);
 
   const bookGroups = useMemo(
     () =>
@@ -4033,7 +3556,6 @@ export const LibraryPanel = memo(function LibraryPanel({
     onDelete,
     onSetCollections,
     onCreateCollection,
-    onElaborate,
     allCards: allCards ?? cards,
     inputContainerRef,
   };
@@ -4179,7 +3701,6 @@ export const LibraryPanel = memo(function LibraryPanel({
           <FilterBar
             filters={filters}
             collections={collections}
-            themes={themes}
             tags={tags}
             onAdd={(f) => {
               setFilters((p) => [...p, f]);
@@ -4649,12 +4170,10 @@ export type Message = {
   text?: string;
   card?: CardLike;
   liveCard?: CardLike | null;
-  connections?: Connection[] | null;
   prompts?: WritePrompt[];
   cards?: CardLike[];
   framing?: string;
   suggestions?: Suggestion[];
-  stats?: Stats;
   session?: ReadingSession;
   quotes?: ImportQuote[];
   label?: string;
@@ -4669,8 +4188,6 @@ export const MsgBubble = function MsgBubble({
   onDelete,
   onSetCollections,
   onCreateCollection,
-  onElaborate,
-  onDismissConnection,
   onImportConfirm,
   onImportDiscard,
   onReadingNote,
@@ -4685,8 +4202,6 @@ export const MsgBubble = function MsgBubble({
   onDelete: (id: string) => void;
   onSetCollections: (id: string, ids: string[]) => void;
   onCreateCollection: (col: Collection) => void;
-  onElaborate?: (card: CardLike) => void;
-  onDismissConnection: (id: string) => void;
   onImportConfirm: (id: string, quotes: ImportQuote[]) => void;
   onImportDiscard: (id: string) => void;
   onReadingNote?: (cardId: string, note: string) => void;
@@ -4726,7 +4241,6 @@ export const MsgBubble = function MsgBubble({
     onDelete,
     onSetCollections,
     onCreateCollection,
-    onElaborate,
     allCards,
     savedCardId,
     inputContainerRef,
@@ -4750,10 +4264,6 @@ export const MsgBubble = function MsgBubble({
               justSaved={savedLive?.id === savedCardId}
             />
           </div>
-          <ConnectionNotice
-            connections={m.connections ?? undefined}
-            onDismiss={() => onDismissConnection(m.id)}
-          />
         </div>
       )}
       {m.type === "synthesis" && (
@@ -4779,12 +4289,6 @@ export const MsgBubble = function MsgBubble({
       )}
       {m.type === "recommend" && (
         <RecommendBlock suggestions={m.suggestions} />
-      )}
-      {m.type === "elaborate" && m.card && (
-        <ElaborateBlock card={liveCard(m.card)} text={m.text ?? ""} />
-      )}
-      {m.type === "stats" && m.stats && (
-        <StatsBlock stats={m.stats} />
       )}
       {m.type === "reading" && m.session && (
         <ReadingSessionBlock
