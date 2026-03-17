@@ -1125,8 +1125,6 @@ const CardDetailDrawer = memo(function CardDetailDrawer({
     if (creatingCol) colInputRef.current?.focus();
   }, [creatingCol]);
 
-  useKey("Escape", onClose, [onClose]);
-
   const wordCount = note.trim() ? note.trim().split(/\s+/).length : 0;
 
   const allTags = useMemo(() => {
@@ -1170,7 +1168,7 @@ const CardDetailDrawer = memo(function CardDetailDrawer({
     if (book.trim() !== card.book) patch.book = book.trim();
     if ((author.trim() || "") !== (card.author ?? "")) patch.author = author.trim();
     if (note.trim() !== (card.note ?? "")) patch.note = note.trim();
-    if (!quote.trim() || !book.trim()) return;
+    if (!quote.trim() || !book.trim()) { onClose(); return; }
     if (Object.keys(patch).length) onUpdate(card.id, patch);
     const origTags = card.tags ?? [];
     if (JSON.stringify(selectedTags) !== JSON.stringify(origTags)) onTagsChange(card.id, selectedTags);
@@ -1179,6 +1177,8 @@ const CardDetailDrawer = memo(function CardDetailDrawer({
     if (JSON.stringify(newCols.sort()) !== JSON.stringify([...origCols].sort())) onSetCollections(card.id, newCols);
     onClose();
   };
+
+  useKey("Escape", handleSave, [handleSave]);
 
   const toggle = (section: string) =>
     setExpandedSection((p) => (p === section ? "" : section));
@@ -1212,7 +1212,7 @@ const CardDetailDrawer = memo(function CardDetailDrawer({
   return (
     <>
       <div
-        onClick={onClose}
+        onClick={handleSave}
         style={{
           position: "fixed",
           inset: 0,
