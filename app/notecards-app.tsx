@@ -48,7 +48,6 @@ const SYSTEM =
 
 // ─── localStorage keys ─────────────────────────────────────────────────────────
 const STORAGE_KEYS = {
-  collections: "nc_collections_v1",
   dark: "nc_dark_v1",
 };
 
@@ -63,7 +62,7 @@ type NotecardRow = {
   year: number | null;
   tags: string[] | null;
   note: string | null;
-  collection_ids: string[] | null;
+  location: string | null;
   starred: boolean;
   created_at: string | null;
   last_seen_at: string | null;
@@ -77,7 +76,7 @@ const rowToCard = (row: NotecardRow) => ({
   year: row.year,
   tags: row.tags ?? [],
   note: row.note ?? "",
-  collectionIds: row.collection_ids ?? [],
+  location: row.location ?? "",
   starred: row.starred ?? false,
   createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
   lastSeenAt: row.last_seen_at ? new Date(row.last_seen_at).getTime() : Date.now(),
@@ -92,7 +91,7 @@ const cardToRow = (card: any, userId: string): NotecardRow => ({
   year: card.year ?? null,
   tags: card.tags ?? [],
   note: card.note || null,
-  collection_ids: card.collectionIds ?? [],
+  location: card.location || null,
   starred: card.starred ?? false,
   created_at: new Date(card.createdAt || Date.now()).toISOString(),
   last_seen_at: new Date(card.lastSeenAt || card.createdAt || Date.now()).toISOString(),
@@ -118,10 +117,6 @@ function cardsReducer(state: any[], action: any) {
     case "SET_TAGS":
       return state.map((c) =>
         c.id === action.id ? { ...c, tags: action.tags } : c,
-      );
-    case "SET_COLS":
-      return state.map((c) =>
-        c.id === action.id ? { ...c, collectionIds: action.ids } : c,
       );
     default:
       return state;
@@ -286,7 +281,7 @@ const DEMO_CARDS = [
     year: 180,
     tags: ["stoicism", "obstacles", "mindset"],
     note: "",
-    collectionIds: [],
+    location: "Book 5, Section 20",
     starred: false,
     createdAt: NOW() - 864e5 * 10,
     lastSeenAt: undefined,
@@ -300,7 +295,7 @@ const DEMO_CARDS = [
     year: -350,
     tags: ["habits", "excellence", "character"],
     note: "Counter to the Stoic emphasis on momentary choice?",
-    collectionIds: [],
+    location: "",
     starred: false,
     createdAt: NOW() - 864e5 * 8,
     lastSeenAt: undefined,
@@ -314,7 +309,7 @@ const DEMO_CARDS = [
     year: 2011,
     tags: ["reading", "life", "imagination"],
     note: "",
-    collectionIds: [],
+    location: "",
     starred: false,
     createdAt: NOW() - 864e5 * 5,
     lastSeenAt: undefined,
@@ -327,7 +322,7 @@ const DEMO_CARDS = [
     year: 2000,
     tags: ["writing", "drafts", "craft"],
     note: "Permission slip for every writer.",
-    collectionIds: [],
+    location: "p. 37",
     starred: false,
     createdAt: NOW() - 864e5 * 3,
     lastSeenAt: undefined,
@@ -341,7 +336,7 @@ const DEMO_CARDS = [
     year: 2018,
     tags: ["habits", "systems", "goals"],
     note: "",
-    collectionIds: [],
+    location: "Ch. 1",
     starred: false,
     createdAt: NOW() - 864e5,
     lastSeenAt: undefined,
@@ -419,9 +414,9 @@ async function smartWrite(topic: string, cards: any[], signal: AbortSignal) {
     const focus = topic ? ` about "${topic}"` : "";
     return {
       prompts: [
-        { mode: "Argue", label: "Take a position", prompt: `Write a short argument${focus} based on something you've read recently. What claim would you defend, and why?` },
-        { mode: "Open", label: "First paragraph", prompt: `Draft the opening paragraph of an essay${focus}. Start with a vivid image or a surprising statement.` },
-        { mode: "Tension", label: "Write the contradiction", prompt: `Think of two ideas${focus ? focus.replace("about", "related to") : ""} that seem to contradict each other. Write about the tension between them.` },
+        { label: "Take a position", prompt: `Write a short argument${focus} based on something you've read recently. What claim would you defend, and why?` },
+        { label: "First paragraph", prompt: `Draft the opening paragraph of an essay${focus}. Start with a vivid image or a surprising statement.` },
+        { label: "The contradiction", prompt: `Think of two ideas${focus ? focus.replace("about", "related to") : ""} that seem to contradict each other. Write about the tension between them.` },
       ],
       cards: [],
     };
@@ -435,7 +430,7 @@ async function smartWrite(topic: string, cards: any[], signal: AbortSignal) {
       )
     : cards;
   const sample = (relevant.length ? relevant : cards).slice(0, 8);
-  const prompt = `Quotes:\n${sample.map(cardToCtx).join("\n")}${topic ? `\nFocus: "${topic}"` : ""}\n\nGenerate 3 writing prompts. JSON: {"prompts":[{"mode":"Argue","label":"Take a position","prompt":"<2-3 sentences>"},{"mode":"Open","label":"First paragraph","prompt":"<2-3 sentences>"},{"mode":"Tension","label":"Write the contradiction","prompt":"<2-3 sentences>"}],"source_indices":[]}`;
+  const prompt = `Quotes:\n${sample.map(cardToCtx).join("\n")}${topic ? `\nFocus: "${topic}"` : ""}\n\nGenerate 3 diverse writing prompts inspired by these quotes. Each should suggest a different angle or approach. JSON: {"prompts":[{"label":"<short label>","prompt":"<2-3 sentences>"}],"source_indices":[]}`;
   const raw = await callClaude(
     [{ role: "user", content: prompt }],
     "You are a writing coach. Reference actual quotes and books. Use *asterisks* for titles.",
@@ -446,52 +441,6 @@ async function smartWrite(topic: string, cards: any[], signal: AbortSignal) {
     prompts: p.prompts || [],
     cards: (p.source_indices || []).map((i: number) => sample[i]).filter(Boolean),
   };
-}
-
-async function generateDigest(cards: any[], signal: AbortSignal) {
-  if (!cards.length) return null;
-  const now = NOW();
-  const aged = cards.filter(
-    (c) => now - (c.lastSeenAt || c.createdAt) > 864e5 * 14,
-  );
-  const pool = aged.length >= 3 ? aged : cards;
-  const shuffled = [...pool].sort(() => Math.random() - 0.5).slice(0, 5);
-  const prompt = `Select exactly 3 of these quotes that feel thematically connected today. JSON: {"selected_indices":[i,j,k],"framing":"<1 warm, precise sentence naming the thread>"}`;
-  try {
-    const raw = await callClaude(
-      [{ role: "user", content: JSON.stringify(shuffled.map(cardToCtx)) }],
-      prompt,
-      signal,
-    );
-    const p = await parseJSON(raw);
-    const selected = (p.selected_indices || [0, 1, 2])
-      .map((i: number) => shuffled[i])
-      .filter(Boolean)
-      .slice(0, 3);
-    return {
-      cards: selected,
-      framing: p.framing || "Three cards worth sitting with today.",
-    };
-  } catch {
-    return {
-      cards: shuffled.slice(0, 3),
-      framing: "Three cards worth sitting with today.",
-    };
-  }
-}
-
-async function suggestReading(cards: any[], signal: AbortSignal) {
-  if (!cards.length) return null;
-  const sample = cards.slice(0, 20).map(cardToCtx).join("\n");
-  const prompt = `Based on this reading library:\n${sample}\n\nSuggest 4-5 books this person would deeply benefit from reading next. JSON: {"suggestions":[{"title":"<title>","author":"<author>","year":<year or null>,"why":"<1-2 sentences>"}]}`;
-  const raw = await callClaude(
-    [{ role: "user", content: prompt }],
-    "Return ONLY JSON, no markdown. Be specific and surprising.",
-    signal,
-    true,
-  );
-  const p = await parseJSON(raw);
-  return p.suggestions || [];
 }
 
 async function parseImportChunk(text: string, signal: AbortSignal) {
@@ -575,7 +524,6 @@ type NotecardsAppProps = {
 
 export default function NotecardsApp({ userId }: NotecardsAppProps) {
   const [cards, dispatch] = useReducer(cardsReducer, []);
-  const [collections, setCollections] = useState<any[]>([]);
   const [dark, setDark] = useState(false);
   const [storageLoaded, setStorageLoaded] = useState(false);
   const [cardsLoading, setCardsLoading] = useState(true);
@@ -600,6 +548,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
   const [showMorningCard, setShowMorningCard] = useState(false);
   const [savedCardId, setSavedCardId] = useState<string | null>(null);
   const [tagDrawer, setTagDrawer] = useState<any>(null);
+  const [undoToast, setUndoToast] = useState<{ card: any; timer: ReturnType<typeof setTimeout> } | null>(null);
 
   const C = dark ? DARK : LIGHT;
 
@@ -628,15 +577,12 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
   // Initial load: Supabase for cards, localStorage for collections/themes/dark
   useEffect(() => {
     async function load() {
-      const [cardsRes, locCollections, locDark] = await Promise.all([
+      const [cardsRes, locDark] = await Promise.all([
         supabase
           .from("notecards")
           .select("*")
           .eq("user_id", userId)
           .order("created_at", { ascending: false }),
-        typeof window !== "undefined"
-          ? JSON.parse(localStorage.getItem(STORAGE_KEYS.collections) ?? "null")
-          : null,
         typeof window !== "undefined"
           ? (() => {
               const v = localStorage.getItem(STORAGE_KEYS.dark);
@@ -651,7 +597,6 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
           cards: data.map((row: NotecardRow) => rowToCard(row)),
         });
       }
-      if (Array.isArray(locCollections)) setCollections(locCollections);
       if (typeof locDark === "boolean") setDark(locDark);
       setStorageLoaded(true);
       setCardsLoading(false);
@@ -666,11 +611,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
     setShowMorningCard(true);
   }, [cardsLoading, cards.length, messages.length]);
 
-  // Persist collections, themes, dark to localStorage when storageLoaded
-  useEffect(() => {
-    if (!storageLoaded || typeof window === "undefined") return;
-    localStorage.setItem(STORAGE_KEYS.collections, JSON.stringify(collections));
-  }, [storageLoaded, collections]);
+  // Persist dark mode to localStorage when storageLoaded
   useEffect(() => {
     if (!storageLoaded || typeof window === "undefined") return;
     localStorage.setItem(STORAGE_KEYS.dark, JSON.stringify(dark));
@@ -686,6 +627,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
       if (patch.author !== undefined) up.author = patch.author;
       if (patch.year !== undefined) up.year = patch.year;
       if (patch.note !== undefined) up.note = patch.note;
+      if (patch.location !== undefined) up.location = patch.location;
       if (patch.starred !== undefined) up.starred = patch.starred;
       if (Object.keys(up).length)
         supabase
@@ -710,29 +652,31 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
     [userId]
   );
   const deleteCard = useCallback(
-    async (id: string) => {
+    (id: string) => {
+      const card = cards.find((c) => c.id === id);
+      if (!card) return;
       dispatch({ type: "DELETE", id });
-      const { error } = await supabase
-        .from("notecards")
-        .delete()
-        .eq("id", id)
-        .eq("user_id", userId);
-      if (error) console.error("Supabase delete error:", error);
+      // Cancel any pending undo toast
+      if (undoToast) clearTimeout(undoToast.timer);
+      const timer = setTimeout(async () => {
+        setUndoToast(null);
+        const { error } = await supabase
+          .from("notecards")
+          .delete()
+          .eq("id", id)
+          .eq("user_id", userId);
+        if (error) console.error("Supabase delete error:", error);
+      }, 8000);
+      setUndoToast({ card, timer });
     },
-    [userId]
+    [userId, cards, undoToast]
   );
-  const setCardCols = useCallback(
-    (id: string, ids: string[]) => {
-      dispatch({ type: "SET_COLS", id, ids });
-      supabase
-        .from("notecards")
-        .update({ collection_ids: ids })
-        .eq("id", id)
-        .eq("user_id", userId)
-        .then(null, (err) => console.error("Supabase collections update error:", err));
-    },
-    [userId]
-  );
+  const undoDelete = useCallback(() => {
+    if (!undoToast) return;
+    clearTimeout(undoToast.timer);
+    dispatch({ type: "ADD", card: undoToast.card });
+    setUndoToast(null);
+  }, [undoToast]);
 
   const markCardSeen = useCallback(
     (id: string) => {
@@ -747,7 +691,6 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
     [userId]
   );
 
-  const createCollection = useCallback((col: { id: string; name: string; color: string; createdAt?: number }) => setCollections((p) => [...p, col]), []);
 
   const pickRandom = useCallback((pool: any[]) => {
     const now = NOW();
@@ -829,12 +772,24 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
       if (!ctx) return;
       setMessages((p) => [...p, mkMsg("user", { type: "text", text: author ? `${title} · ${author}` : title })]);
       setInput("");
-      setFlowStage(null);
       setBookSuggs([]);
       setSearchingBooks(false);
       setSelectedBook(null);
       setAuthorDraft("");
       manualBookRef.current = "";
+      setAddCtx((c: any) => ({ ...c, book: title, author, year: year ?? null }));
+      setMessages((p) => [...p, mkMsg("assistant", { type: "text", text: "Page, chapter, or location? *(optional — press Enter to skip)*" })]);
+      setFlowStage("location");
+      setTimeout(() => inputRef.current?.focus(), 50);
+    },
+    []
+  );
+
+  const continueToTags = useCallback(
+    async ({ title, author, year }: { title: string; author: string; year: number | null }) => {
+      const ctx = addCtxRef.current;
+      if (!ctx) return;
+      setFlowStage(null);
       setLoading(true);
       setLL("thinking…");
       abortRef.current?.abort();
@@ -860,7 +815,6 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
       } catch (e: any) {
         if (e?.name === "AbortError") return;
       }
-      setAddCtx((c: any) => ({ ...c, book: title, author, year: year ?? null }));
       setLoading(false);
       setLL("");
       const pid = uid();
@@ -907,7 +861,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
         year: ctx.year,
         tags,
         note: "",
-        collectionIds: [],
+        location: ctx.location ?? "",
         starred: false,
         createdAt: NOW(),
         lastSeenAt: NOW(),
@@ -942,7 +896,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
       year: q.year ?? null,
       tags: (q.tags ?? []).map((t: string) => cleanTag(t)).filter(Boolean),
       note: "",
-      collectionIds: [],
+      location: "",
       starred: false,
       createdAt: NOW(),
       lastSeenAt: NOW(),
@@ -992,6 +946,15 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
 
   const handleSend = useCallback(async () => {
     const raw = input.trim();
+    if (flowStage === "location") {
+      const loc = raw.trim();
+      if (loc) setMessages((p) => [...p, mkMsg("user", { type: "text", text: loc })]);
+      setAddCtx((c: any) => ({ ...c, location: loc }));
+      setInput("");
+      const ctx = addCtxRef.current;
+      if (ctx) continueToTags({ title: ctx.book, author: ctx.author ?? "", year: ctx.year ?? null });
+      return;
+    }
     if (!raw || loading) return;
 
     if (flowStage === "book") {
@@ -1076,16 +1039,6 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
       setLL("");
     };
 
-    if (raw === "/digest") {
-      await ai("/digest", "curating today's cards…", async (sig) => {
-        const result = await generateDigest(sc, sig);
-        if (result) {
-          result.cards.forEach((c: { id: string }) => markCardSeen(c.id));
-          setMessages((p) => [...p, mkMsg("assistant", { type: "digest", framing: result.framing, cards: result.cards })]);
-        } else setMessages((p) => [...p, mkMsg("assistant", { type: "text", text: "Add more cards to get a daily digest." })]);
-      });
-      return;
-    }
     if (cmd === "/read" || cmd.startsWith("/read ")) {
       if (sc.length < 3) {
         setMessages((p) => [...p, mkMsg("user", { type: "text", text: raw })]);
@@ -1096,18 +1049,6 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
         const session = await generateReadingMode(sc, sig);
         if (session) setMessages((p) => [...p, mkMsg("assistant", { type: "reading", session })]);
         else setMessages((p) => [...p, mkMsg("assistant", { type: "text", text: "Couldn't generate a session right now." })]);
-      });
-      return;
-    }
-    if (raw === "/recommend") {
-      if (sc.length < 3) {
-        setMessages((p) => [...p, mkMsg("user", { type: "text", text: raw })]);
-        setMessages((p) => [...p, mkMsg("assistant", { type: "text", text: "Add at least 3 cards so I can understand your tastes." })]);
-        return;
-      }
-      await ai("/recommend", "thinking about your reading…", async (sig) => {
-        const suggestions = await suggestReading(sc, sig);
-        setMessages((p) => [...p, mkMsg("assistant", { type: "recommend", suggestions })]);
       });
       return;
     }
@@ -1214,19 +1155,38 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
     bookAbortRef.current?.abort();
   }, []);
 
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const meta = e.metaKey || e.ctrlKey;
+      if (!meta) return;
+      if (e.key === "k") {
+        e.preventDefault();
+        setInput("/");
+        setTimeout(() => inputRef.current?.focus(), 50);
+      } else if (e.key === "n") {
+        e.preventDefault();
+        setInput("/add ");
+        setTimeout(() => inputRef.current?.focus(), 50);
+      } else if (e.key === "l") {
+        e.preventDefault();
+        setShowLibrary((v) => !v);
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, []);
+
   const showEmpty = !cardsLoading && cards.length === 0 && messages.length === 0;
   const hasInput = input.trim().length > 0;
   const msgCardProps = useMemo(() => ({
-    collections,
     allCards: cards,
     onUpdate: updateCard,
     onTagsChange: updateTags,
     onDelete: deleteCard,
-    onSetCollections: setCardCols,
-    onCreateCollection: createCollection,
     savedCardId,
     inputContainerRef,
-  }), [collections, cards, updateCard, updateTags, deleteCard, setCardCols, createCollection, savedCardId]);
+  }), [cards, updateCard, updateTags, deleteCard, savedCardId]);
 
   return (
     <ThemeCtx.Provider value={C}>
@@ -1311,6 +1271,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
               openRandom();
             }}
             onExport={() => setShowExport(true)}
+            onSmartSearch={(query, signal) => intelligentFind(query, cards, undefined, signal)}
           />
         )}
 
@@ -1625,7 +1586,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
                     />
                     <button
                       onClick={handleSend}
-                      disabled={flowStage !== "author" && (!input.trim() || loading)}
+                      disabled={flowStage !== "author" && flowStage !== "location" && (!input.trim() || loading)}
                       style={{
                         width: 32,
                         height: 32,
@@ -1664,7 +1625,44 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
             </div>
           </div>
         </div>
-        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+        <style>{`@keyframes spin{to{transform:rotate(360deg)}}@keyframes toast-in{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}`}</style>
+        {undoToast && (
+          <div style={{
+            position: "fixed",
+            bottom: 28,
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: C.ink,
+            color: C.base,
+            borderRadius: 10,
+            padding: "10px 18px",
+            display: "flex",
+            alignItems: "center",
+            gap: 14,
+            fontSize: 13,
+            fontFamily: "'DM Sans', system-ui, sans-serif",
+            boxShadow: "0 4px 20px rgba(0,0,0,0.25)",
+            zIndex: 200,
+            animation: "toast-in 0.2s ease-out",
+          }}>
+            <span>Card deleted</span>
+            <button
+              onClick={undoDelete}
+              style={{
+                background: "none",
+                border: "none",
+                color: C.warmDot,
+                cursor: "pointer",
+                fontFamily: "'DM Sans', system-ui, sans-serif",
+                fontWeight: 600,
+                fontSize: 13,
+                padding: 0,
+              }}
+            >
+              Undo
+            </button>
+          </div>
+        )}
       </div>
     </ThemeCtx.Provider>
   );
