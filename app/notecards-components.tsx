@@ -27,7 +27,6 @@ import {
   ChevronDown,
   ChevronUp,
   Star,
-  ArrowRight,
   LayoutList,
   Share2,
 } from "lucide-react";
@@ -106,8 +105,8 @@ export const FONT_SANS = "'DM Sans', 'Inter', system-ui, sans-serif";
 
 export const makeT = (C: Theme): Record<string, React.CSSProperties> => ({
   quoteMain: {
-    fontSize: 18,
-    lineHeight: 1.8,
+    fontSize: 20,
+    lineHeight: 1.75,
     color: C.ink,
     fontFamily: FONT_SERIF,
     letterSpacing: "0.01em",
@@ -1618,8 +1617,10 @@ export const NoteCard = memo(function NoteCard({
       >
         <div
           style={{
-            padding: `${py}px 0`,
+            padding: `${py}px 16px`,
+            margin: "0 -16px",
             borderBottom: `1px solid ${C.border}`,
+            borderRadius: R.md,
             position: "relative",
             background: pulse
               ? C.savedPulse
@@ -1638,7 +1639,7 @@ export const NoteCard = memo(function NoteCard({
             style={{
               position: "absolute",
               top: py + 2,
-              right: 0,
+              right: 16,
               zIndex: 5,
               display: "flex",
               alignItems: "center",
@@ -3782,11 +3783,9 @@ export const RandomCard = memo(function RandomCard({
 export const MorningCard = memo(function MorningCard({
   cards,
   onUpdate,
-  onDismiss,
 }: {
   cards: CardLike[];
   onUpdate: (id: string, patch: Partial<CardLike>) => void;
-  onDismiss: () => void;
 }) {
   const C = useC();
   const T = makeT(C);
@@ -3815,8 +3814,6 @@ export const MorningCard = memo(function MorningCard({
     return () => cancelAnimationFrame(t);
   }, []);
 
-  useKey("Escape", onDismiss, [onDismiss]);
-
   const submitMorningReflection = () => {
     if (!newThoughtM.trim() || !card) return;
     const now = new Date();
@@ -3829,22 +3826,16 @@ export const MorningCard = memo(function MorningCard({
     setShowReflectM(false);
   };
 
-  if (!card) { onDismiss(); return null; }
+  if (!card) return null;
 
   return (
     <div
-      role="dialog"
-      aria-modal="true"
       style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 250,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: 48,
+        padding: "48px 0 32px",
         fontFamily: FONT_SANS,
-        background: C.base,
         opacity: visible ? 1 : 0,
         transition: "opacity 0.6s ease",
       }}
@@ -4063,35 +4054,6 @@ export const MorningCard = memo(function MorningCard({
           >
             <Share2 size={14} /> Share
           </button>
-          <button
-            type="button"
-            onClick={onDismiss}
-            style={{
-              background: "none",
-              border: `1px solid ${C.border}`,
-              borderRadius: R.pill,
-              cursor: "pointer",
-              padding: "8px 20px",
-              color: C.secondary,
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              fontSize: 13,
-              fontFamily: FONT_SANS,
-              fontWeight: 500,
-              transition: "all 0.15s",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = C.borderHover;
-              e.currentTarget.style.color = C.ink;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = C.border;
-              e.currentTarget.style.color = C.secondary;
-            }}
-          >
-            Continue to library <ArrowRight size={13} />
-          </button>
         </div>
       </div>
       {showShareM && (
@@ -4129,13 +4091,23 @@ export const LibraryPanel = memo(function LibraryPanel({
   const [smartSearching, setSmartSearching] = useState(false);
   const smartAbortRef = useRef<AbortController | null>(null);
   const [viewMode, setViewMode] = useState<"book" | "all">("book");
+  const [showOverflow, setShowOverflow] = useState(false);
+  const overflowRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  useKey("Escape", onClose, [onClose]);
   useEffect(() => {
     setTimeout(() => searchRef.current?.focus(), 100);
   }, []);
+  useEffect(() => {
+    if (!showOverflow) return;
+    const h = (e: MouseEvent) => {
+      if (overflowRef.current && !overflowRef.current.contains(e.target as Node))
+        setShowOverflow(false);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [showOverflow]);
 
   // Smart search effect
   useEffect(() => {
@@ -4222,16 +4194,12 @@ export const LibraryPanel = memo(function LibraryPanel({
 
   return (
     <div
-      role="dialog"
-      aria-modal="true"
       style={{
-        position: "fixed",
-        inset: 0,
-        background: C.base,
-        zIndex: 100,
+        flex: 1,
         display: "flex",
         flexDirection: "column",
         fontFamily: FONT_SANS,
+        minHeight: 0,
       }}
     >
       <div
@@ -4241,16 +4209,16 @@ export const LibraryPanel = memo(function LibraryPanel({
           background: C.base,
         }}
       >
-        <div style={{ maxWidth: 660, margin: "0 auto", padding: "0 28px" }}>
+        <div>
           <div
             style={{
-              height: 52,
+              height: 48,
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <span
                 style={{
                   fontSize: 13,
@@ -4262,11 +4230,9 @@ export const LibraryPanel = memo(function LibraryPanel({
               >
                 Library
               </span>
-              <span style={{ ...T.meta, opacity: 0.4, marginLeft: 4 }}>·</span>
-              <span style={{ ...T.caption, marginLeft: 4 }}>
+              <span style={{ ...T.caption, color: C.faint, marginLeft: 2 }}>
                 {visible.length}
-                {hasFilters ? ` of ${cards.length}` : ""} card
-                {visible.length !== 1 ? "s" : ""}
+                {hasFilters ? ` of ${cards.length}` : ""} card{visible.length !== 1 ? "s" : ""}
                 {" "}· {bookCount} book{bookCount !== 1 ? "s" : ""}
                 {starredCount > 0 && (
                   <span style={{ color: C.warmDot }}>
@@ -4275,37 +4241,83 @@ export const LibraryPanel = memo(function LibraryPanel({
                 )}
               </span>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <div style={{ display: "flex", borderRadius: R.md, border: `1px solid ${C.border}`, overflow: "hidden", marginRight: 4 }}>
-                {(["all", "book"] as const).map((mode) => (
-                  <button
-                    key={mode}
-                    onClick={() => setViewMode(mode)}
+            <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+              <div style={{ position: "relative" }} ref={overflowRef}>
+                <button
+                  onClick={() => setShowOverflow((v) => !v)}
+                  title="More actions"
+                  style={{
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    padding: 6,
+                    color: C.faint,
+                    display: "flex",
+                    alignItems: "center",
+                    borderRadius: R.sm,
+                    transition: "color 0.15s",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = C.ink)}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = C.faint)}
+                >
+                  <MoreHorizontal size={16} />
+                </button>
+                {showOverflow && (
+                  <div
                     style={{
-                      padding: "4px 10px",
-                      fontSize: 11,
-                      fontFamily: FONT_SANS,
-                      fontWeight: viewMode === mode ? 500 : 400,
-                      background: viewMode === mode ? C.ink : "transparent",
-                      color: viewMode === mode ? C.base : C.faint,
-                      border: "none",
-                      cursor: "pointer",
-                      transition: "all 0.15s",
+                      position: "absolute",
+                      top: "calc(100% + 4px)",
+                      right: 0,
+                      background: C.base,
+                      border: `1px solid ${C.border}`,
+                      borderRadius: R.lg,
+                      boxShadow: "0 8px 28px rgba(0,0,0,0.09)",
+                      minWidth: 150,
+                      zIndex: 10,
+                      overflow: "hidden",
                     }}
                   >
-                    {mode === "all" ? "All" : "By Book"}
-                  </button>
-                ))}
+                    <button
+                      onClick={() => { setShowOverflow(false); onRandom(); }}
+                      style={{
+                        width: "100%",
+                        textAlign: "left",
+                        padding: "10px 14px",
+                        background: "transparent",
+                        border: "none",
+                        cursor: "pointer",
+                        fontFamily: FONT_SANS,
+                        fontSize: 13,
+                        color: C.ink,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
+                    >
+                      <Shuffle size={13} /> Random card
+                    </button>
+                    <button
+                      onClick={() => { setShowOverflow(false); onExport(); }}
+                      style={{
+                        width: "100%",
+                        textAlign: "left",
+                        padding: "10px 14px",
+                        background: "transparent",
+                        border: "none",
+                        cursor: "pointer",
+                        fontFamily: FONT_SANS,
+                        fontSize: 13,
+                        color: C.ink,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
+                    >
+                      <Download size={13} /> Export
+                    </button>
+                  </div>
+                )}
               </div>
-              <Btn variant="ghost" size="sm" onClick={onRandom}>
-                <Shuffle size={12} /> Random
-              </Btn>
-              <Btn variant="ghost" size="sm" onClick={onExport}>
-                <Download size={12} /> Export
-              </Btn>
-              <Btn variant="ghost" size="sm" onClick={onClose}>
-                <X size={12} /> Close
-              </Btn>
             </div>
           </div>
         </div>
@@ -4318,14 +4330,33 @@ export const LibraryPanel = memo(function LibraryPanel({
       >
         <div
           style={{
-            maxWidth: 660,
-            margin: "0 auto",
-            padding: "10px 28px",
+            padding: "10px 0",
             display: "flex",
             alignItems: "center",
             gap: 10,
           }}
         >
+          <div style={{ display: "flex", borderRadius: R.md, border: `1px solid ${C.border}`, overflow: "hidden", flexShrink: 0 }}>
+            {(["all", "book"] as const).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => setViewMode(mode)}
+                style={{
+                  padding: "5px 10px",
+                  fontSize: 11,
+                  fontFamily: FONT_SANS,
+                  fontWeight: viewMode === mode ? 500 : 400,
+                  background: viewMode === mode ? C.ink : "transparent",
+                  color: viewMode === mode ? C.base : C.faint,
+                  border: "none",
+                  cursor: "pointer",
+                  transition: "all 0.15s",
+                }}
+              >
+                {mode === "all" ? "All" : "By Book"}
+              </button>
+            ))}
+          </div>
           <div style={{ position: "relative", flex: 1 }}>
             <Search
               size={12}
@@ -4421,9 +4452,7 @@ export const LibraryPanel = memo(function LibraryPanel({
       <div ref={scrollRef} style={{ flex: 1, overflowY: "auto" }}>
         <div
           style={{
-            maxWidth: 660,
-            margin: "0 auto",
-            padding: "4px 28px 100px",
+            padding: "4px 0 100px",
           }}
         >
           {visible.length === 0 ? (
