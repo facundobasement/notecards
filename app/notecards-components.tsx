@@ -4660,7 +4660,7 @@ export type Message = {
   label?: string;
 };
 
-export const MsgBubble = memo(function MsgBubble({
+export const MsgBubble = function MsgBubble({
   m,
   collections,
   allCards,
@@ -4827,4 +4827,4 @@ export const MsgBubble = memo(function MsgBubble({
       )}
     </div>
   );
-});
+};
