@@ -778,22 +778,24 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
       if (patch.year !== undefined) up.year = patch.year;
       if (patch.note !== undefined) up.note = patch.note;
       if (Object.keys(up).length)
-        void supabase
+        supabase
           .from("notecards")
           .update(up)
           .eq("id", id)
-          .eq("user_id", userId);
+          .eq("user_id", userId)
+          .then(null, (err) => console.error("Supabase update error:", err));
     },
     [userId]
   );
   const updateTags = useCallback(
     (id: string, tags: string[]) => {
       dispatch({ type: "SET_TAGS", id, tags });
-      void supabase
+      supabase
         .from("notecards")
         .update({ tags })
         .eq("id", id)
-        .eq("user_id", userId);
+        .eq("user_id", userId)
+        .then(null, (err) => console.error("Supabase tags update error:", err));
     },
     [userId]
   );
@@ -812,11 +814,12 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
   const setCardCols = useCallback(
     (id: string, ids: string[]) => {
       dispatch({ type: "SET_COLS", id, ids });
-      void supabase
+      supabase
         .from("notecards")
         .update({ collection_ids: ids })
         .eq("id", id)
-        .eq("user_id", userId);
+        .eq("user_id", userId)
+        .then(null, (err) => console.error("Supabase collections update error:", err));
     },
     [userId]
   );
@@ -824,11 +827,12 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
   const markCardSeen = useCallback(
     (id: string) => {
       dispatch({ type: "SEEN", id });
-      void supabase
+      supabase
         .from("notecards")
         .update({ last_seen_at: new Date().toISOString() })
         .eq("id", id)
-        .eq("user_id", userId);
+        .eq("user_id", userId)
+        .then(null, (err) => console.error("Supabase seen update error:", err));
     },
     [userId]
   );
@@ -905,11 +909,12 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
     if (!card) return;
     const newNote = card.note ? card.note + "\n\n— " + note : note;
     dispatch({ type: "UPDATE", id: cardId, patch: { note: newNote } });
-    void supabase
+    supabase
       .from("notecards")
       .update({ note: newNote })
       .eq("id", cardId)
-      .eq("user_id", userId);
+      .eq("user_id", userId)
+      .then(null, (err) => console.error("Supabase elaborate update error:", err));
   }, [userId]);
 
   const handleInputChange = useCallback((val: string) => {
