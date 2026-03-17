@@ -134,8 +134,9 @@ async function callClaude(
   system: string,
   signal: AbortSignal,
   useSearch = false,
+  maxTokens = 2000,
 ) {
-  const body: any = { model: MODEL, max_tokens: 2000, system, messages };
+  const body: any = { model: MODEL, max_tokens: maxTokens, system, messages };
   if (useSearch)
     body.tools = [{ type: "web_search_20250305", name: "web_search" }];
   const res = await fetch("/api/claude", {
@@ -157,7 +158,13 @@ async function callClaude(
   );
 }
 async function parseJSON(raw: string) {
-  return JSON.parse(raw.replace(/```json|```/g, "").trim());
+  let s = raw.replace(/```json|```/g, "").trim();
+  // Extract JSON object/array if Claude wrapped it in extra text
+  const start = s.search(/[\[{]/);
+  if (start > 0) s = s.slice(start);
+  const end = Math.max(s.lastIndexOf("}"), s.lastIndexOf("]"));
+  if (end > 0) s = s.slice(0, end + 1);
+  return JSON.parse(s);
 }
 
 // ─── Book search ──────────────────────────────────────────────────────────────
@@ -423,6 +430,17 @@ async function intelligentFind(
 }
 
 async function smartWrite(topic: string, cards: any[], signal: AbortSignal) {
+  if (!cards.length) {
+    const focus = topic ? ` about "${topic}"` : "";
+    return {
+      prompts: [
+        { mode: "Argue", label: "Take a position", prompt: `Write a short argument${focus} based on something you've read recently. What claim would you defend, and why?` },
+        { mode: "Open", label: "First paragraph", prompt: `Draft the opening paragraph of an essay${focus}. Start with a vivid image or a surprising statement.` },
+        { mode: "Tension", label: "Write the contradiction", prompt: `Think of two ideas${focus ? focus.replace("about", "related to") : ""} that seem to contradict each other. Write about the tension between them.` },
+      ],
+      cards: [],
+    };
+  }
   const relevant = topic
     ? cards.filter(
         (c) =>
@@ -542,15 +560,44 @@ async function suggestReading(cards: any[], signal: AbortSignal) {
   return p.suggestions || [];
 }
 
-async function parseImportText(text: string, signal: AbortSignal) {
+async function parseImportChunk(text: string, signal: AbortSignal) {
   const prompt = `Parse the following text and extract book quotes.\n\nText:\n${text}\n\nJSON: {"quotes":[{"quote":"<exact quote text>","book":"<book title>","author":"<author name or empty>","year":<year number or null>,"tags":["<tag1>","<tag2>"]}]}\n\nRules:\n- Extract as many distinct quotes as possible\n- Generate 2-4 relevant lowercase tags per quote\n- Return empty array if no quotes found`;
   const raw = await callClaude(
     [{ role: "user", content: prompt }],
     "Return ONLY JSON, no markdown.",
     signal,
+    false,
+    8192,
   );
   const p = await parseJSON(raw);
   return p.quotes || [];
+}
+
+async function parseImportText(text: string, signal: AbortSignal) {
+  // Split long texts into chunks to avoid truncated JSON responses
+  const MAX_CHUNK = 6000; // ~6k chars per chunk to stay within token limits
+  if (text.length <= MAX_CHUNK) return parseImportChunk(text, signal);
+  const chunks: string[] = [];
+  let remaining = text;
+  while (remaining.length > 0) {
+    if (remaining.length <= MAX_CHUNK) {
+      chunks.push(remaining);
+      break;
+    }
+    // Split at a paragraph or line boundary near the limit
+    let splitAt = remaining.lastIndexOf("\n\n", MAX_CHUNK);
+    if (splitAt < MAX_CHUNK * 0.4) splitAt = remaining.lastIndexOf("\n", MAX_CHUNK);
+    if (splitAt < MAX_CHUNK * 0.4) splitAt = MAX_CHUNK;
+    chunks.push(remaining.slice(0, splitAt));
+    remaining = remaining.slice(splitAt).trimStart();
+  }
+  const results = [];
+  for (const chunk of chunks) {
+    if (signal.aborted) throw new DOMException("Aborted", "AbortError");
+    const quotes = await parseImportChunk(chunk, signal);
+    results.push(...quotes);
+  }
+  return results;
 }
 
 async function generateReadingMode(cards: any[], signal: AbortSignal) {
