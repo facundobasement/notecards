@@ -26,6 +26,8 @@ import {
   MoreHorizontal,
   ChevronDown,
   ChevronUp,
+  Star,
+  ArrowRight,
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -39,6 +41,7 @@ export interface CardLike {
   tags?: string[];
   note?: string;
   collectionIds?: string[];
+  starred?: boolean;
   createdAt?: number;
   lastSeenAt?: number;
 }
@@ -1236,9 +1239,30 @@ const CardDetailDrawer = memo(function CardDetailDrawer({
           transition: "transform 0.28s cubic-bezier(0.32,0.72,0,1)",
         }}
       >
-        {/* Drag handle */}
-        <div style={{ display: "flex", justifyContent: "center", padding: "14px 0 8px" }}>
+        {/* Drag handle + star */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "14px 0 8px", position: "relative" }}>
           <div style={{ width: 32, height: 3, borderRadius: 2, background: C.border }} />
+          <button
+            type="button"
+            onClick={() => onUpdate(card.id, { starred: !card.starred })}
+            style={{
+              position: "absolute",
+              right: 20,
+              top: 10,
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: "4px 6px",
+              color: card.starred ? C.warmDot : C.faint,
+              display: "flex",
+              alignItems: "center",
+              transition: "color 0.15s",
+            }}
+            onMouseEnter={(e) => { if (!card.starred) e.currentTarget.style.color = C.warmDot; }}
+            onMouseLeave={(e) => { if (!card.starred) e.currentTarget.style.color = C.faint; }}
+          >
+            <Star size={15} fill={card.starred ? C.warmDot : "none"} />
+          </button>
         </div>
 
         {/* Scrollable content */}
@@ -1651,16 +1675,49 @@ export const NoteCard = memo(function NoteCard({
           className="nc-card"
           onClick={handleCardClick}
         >
-        {/* Always-visible ··· menu (non-selectable mode) */}
+        {/* Star toggle + ··· menu (non-selectable mode) */}
         {!selectable && (
           <div
-            ref={menuRef}
             style={{
               position: "absolute",
               top: py + 2,
               right: 0,
               zIndex: 5,
+              display: "flex",
+              alignItems: "center",
+              gap: 2,
             }}
+          >
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onUpdate(card.id, { starred: !card.starred });
+              }}
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                padding: "2px 4px",
+                color: card.starred ? C.warmDot : C.faint,
+                display: "flex",
+                alignItems: "center",
+                opacity: card.starred ? 1 : hovered ? 0.6 : 0,
+                transition: "color 0.15s, opacity 0.15s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.opacity = "1";
+                if (!card.starred) e.currentTarget.style.color = C.warmDot;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.opacity = card.starred ? "1" : hovered ? "0.6" : "0";
+                if (!card.starred) e.currentTarget.style.color = C.faint;
+              }}
+            >
+              <Star size={13} fill={card.starred ? C.warmDot : "none"} />
+            </button>
+          <div
+            ref={menuRef}
           >
             <button
               type="button"
@@ -1727,6 +1784,7 @@ export const NoteCard = memo(function NoteCard({
                 </button>
               </div>
             )}
+          </div>
           </div>
         )}
 
@@ -2938,6 +2996,7 @@ export const FilterBar = memo(function FilterBar({
   const typeOptions = [
     tags.length && { type: "tag", label: "Tag" },
     collections.length && { type: "coll", label: "Collection" },
+    { type: "starred", label: "Starred" },
   ].filter(Boolean) as { type: string; label: string }[];
 
   const valueOptions = useMemo(() => {
@@ -2976,6 +3035,7 @@ export const FilterBar = memo(function FilterBar({
         typeLabel: "Collection",
       };
     }
+    if (f.type === "starred") return { label: "Yes", dot: undefined, typeLabel: "Starred" };
     return { label: f.value, dot: undefined, typeLabel: "" };
   };
 
@@ -3155,9 +3215,18 @@ export const FilterBar = memo(function FilterBar({
             {typeOptions.map((opt) => (
               <MenuRow
                 key={opt.type}
-                onClick={() => setStep(opt)}
+                onClick={() => {
+                  if (opt.type === "starred") {
+                    const alreadyHas = filters.some((f) => f.type === "starred");
+                    if (!alreadyHas) onAdd({ id: uid(), type: "starred", value: "true" });
+                    setStep(null);
+                  } else {
+                    setStep(opt);
+                  }
+                }}
               >
-                <span style={{ fontSize: 13, color: C.secondary }}>
+                <span style={{ fontSize: 13, color: C.secondary, display: "flex", alignItems: "center", gap: 6 }}>
+                  {opt.type === "starred" && <Star size={11} />}
                   {opt.label}
                 </span>
               </MenuRow>
@@ -3471,6 +3540,205 @@ export const RandomCard = memo(function RandomCard({
   );
 });
 
+// ─── MorningCard ──────────────────────────────────────────────────────────────
+export const MorningCard = memo(function MorningCard({
+  cards,
+  onUpdate,
+  onDismiss,
+}: {
+  cards: CardLike[];
+  onUpdate: (id: string, patch: Partial<CardLike>) => void;
+  onDismiss: () => void;
+}) {
+  const C = useC();
+  const T = makeT(C);
+  const [visible, setVisible] = useState(false);
+
+  const card = useMemo(() => {
+    if (!cards.length) return null;
+    const now = Date.now();
+    const sevenDays = 864e5 * 7;
+    // Score cards: prefer not-recently-seen, weight starred cards higher
+    const scored = cards.map((c) => {
+      const age = now - (c.lastSeenAt ?? c.createdAt ?? 0);
+      const stale = age > sevenDays ? 3 : age > 864e5 * 3 ? 2 : 1;
+      const starBonus = c.starred ? 2 : 1;
+      return { card: c, score: stale * starBonus + Math.random() * 0.5 };
+    });
+    scored.sort((a, b) => b.score - a.score);
+    return scored[0]?.card ?? null;
+  }, [cards]);
+
+  useEffect(() => {
+    const t = requestAnimationFrame(() => setVisible(true));
+    return () => cancelAnimationFrame(t);
+  }, []);
+
+  useKey("Escape", onDismiss, [onDismiss]);
+
+  if (!card) { onDismiss(); return null; }
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 250,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 48,
+        fontFamily: FONT_SANS,
+        background: C.base,
+        opacity: visible ? 1 : 0,
+        transition: "opacity 0.6s ease",
+      }}
+    >
+      <div
+        style={{
+          maxWidth: 560,
+          width: "100%",
+          opacity: visible ? 1 : 0,
+          transform: visible ? "scale(1) translateY(0)" : "scale(0.97) translateY(12px)",
+          transition: "opacity 0.8s ease 0.15s, transform 0.8s ease 0.15s",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+        }}
+      >
+        {/* Thin rule */}
+        <div style={{ width: 32, height: 1, background: C.border, marginBottom: 48 }} />
+
+        {/* Quote */}
+        <p
+          style={{
+            fontFamily: FONT_SERIF,
+            fontSize: 24,
+            lineHeight: 1.65,
+            color: C.ink,
+            textAlign: "center",
+            fontWeight: 400,
+            letterSpacing: "-0.01em",
+            marginBottom: 40,
+            maxWidth: 500,
+          }}
+        >
+          {card.quote}
+        </p>
+
+        {/* Rule */}
+        <div style={{ width: 24, height: 1, background: C.border, marginBottom: 28 }} />
+
+        {/* Book + author */}
+        <div style={{ textAlign: "center", marginBottom: 20 }}>
+          <p style={{ ...T.book, fontSize: 12, marginBottom: 5 }}>{card.book}</p>
+          {card.author && (
+            <p style={{ ...T.author, fontSize: 13 }}>
+              {card.author}
+              {card.year != null ? ` · ${fmtYear(card.year)}` : ""}
+            </p>
+          )}
+        </div>
+
+        {/* Annotation */}
+        {card.note && (
+          <p
+            style={{
+              fontSize: 14,
+              color: C.muted,
+              maxWidth: 420,
+              textAlign: "center",
+              lineHeight: 1.8,
+              fontFamily: FONT_SERIF,
+              fontStyle: "italic",
+              marginBottom: 28,
+              padding: "16px 20px",
+              borderLeft: `2px solid ${C.border}`,
+              borderRight: `2px solid ${C.border}`,
+            }}
+          >
+            {card.note}
+          </p>
+        )}
+
+        {/* Tags */}
+        {(card.tags ?? []).length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginBottom: 32 }}>
+            {(card.tags ?? []).map((t) => (
+              <Tag key={t}>{t}</Tag>
+            ))}
+          </div>
+        )}
+
+        {/* Actions */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 16 }}>
+          <button
+            type="button"
+            onClick={() => onUpdate(card.id, { starred: !card.starred })}
+            style={{
+              background: "none",
+              border: `1px solid ${C.border}`,
+              borderRadius: R.pill,
+              cursor: "pointer",
+              padding: "8px 16px",
+              color: card.starred ? C.warmDot : C.faint,
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 13,
+              fontFamily: FONT_SANS,
+              fontWeight: 500,
+              transition: "all 0.15s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = C.borderHover;
+              if (!card.starred) e.currentTarget.style.color = C.warmDot;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = C.border;
+              if (!card.starred) e.currentTarget.style.color = C.faint;
+            }}
+          >
+            <Star size={14} fill={card.starred ? C.warmDot : "none"} />
+            {card.starred ? "Starred" : "Star"}
+          </button>
+          <button
+            type="button"
+            onClick={onDismiss}
+            style={{
+              background: "none",
+              border: `1px solid ${C.border}`,
+              borderRadius: R.pill,
+              cursor: "pointer",
+              padding: "8px 20px",
+              color: C.secondary,
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 13,
+              fontFamily: FONT_SANS,
+              fontWeight: 500,
+              transition: "all 0.15s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = C.borderHover;
+              e.currentTarget.style.color = C.ink;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = C.border;
+              e.currentTarget.style.color = C.secondary;
+            }}
+          >
+            Continue to library <ArrowRight size={13} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+});
+
 export const LibraryPanel = memo(function LibraryPanel({
   cards,
   collections,
@@ -3520,6 +3788,8 @@ export const LibraryPanel = memo(function LibraryPanel({
         r = r.filter((c) =>
           (c.collectionIds ?? []).includes(f.value)
         );
+      if (f.type === "starred")
+        r = r.filter((c) => c.starred === true);
     }
     if (search.trim()) {
       const q = search.trim().toLowerCase();
@@ -3548,6 +3818,7 @@ export const LibraryPanel = memo(function LibraryPanel({
       ),
     [visible]
   );
+  const starredCount = useMemo(() => cards.filter((c) => c.starred).length, [cards]);
   const hasFilters = filters.length > 0 || search.trim().length > 0;
   const cardProps = {
     collections,
@@ -3607,6 +3878,11 @@ export const LibraryPanel = memo(function LibraryPanel({
                 {visible.length}
                 {hasFilters ? ` of ${cards.length}` : ""} card
                 {visible.length !== 1 ? "s" : ""}
+                {starredCount > 0 && (
+                  <span style={{ color: C.warmDot, marginLeft: 2 }}>
+                    {" "}· {starredCount} starred
+                  </span>
+                )}
               </span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 4 }}>

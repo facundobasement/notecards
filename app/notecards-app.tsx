@@ -32,6 +32,7 @@ import {
   Thinking,
   CommandPalette,
   BookPalette,
+  MorningCard,
 } from "./notecards-components";
 
 const NOW = () => Date.now();
@@ -63,6 +64,7 @@ type NotecardRow = {
   tags: string[] | null;
   note: string | null;
   collection_ids: string[] | null;
+  starred: boolean;
   created_at: string | null;
   last_seen_at: string | null;
 };
@@ -76,6 +78,7 @@ const rowToCard = (row: NotecardRow) => ({
   tags: row.tags ?? [],
   note: row.note ?? "",
   collectionIds: row.collection_ids ?? [],
+  starred: row.starred ?? false,
   createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
   lastSeenAt: row.last_seen_at ? new Date(row.last_seen_at).getTime() : Date.now(),
 });
@@ -90,6 +93,7 @@ const cardToRow = (card: any, userId: string): NotecardRow => ({
   tags: card.tags ?? [],
   note: card.note || null,
   collection_ids: card.collectionIds ?? [],
+  starred: card.starred ?? false,
   created_at: new Date(card.createdAt || Date.now()).toISOString(),
   last_seen_at: new Date(card.lastSeenAt || card.createdAt || Date.now()).toISOString(),
 });
@@ -283,6 +287,7 @@ const DEMO_CARDS = [
     tags: ["stoicism", "obstacles", "mindset"],
     note: "",
     collectionIds: [],
+    starred: false,
     createdAt: NOW() - 864e5 * 10,
     lastSeenAt: undefined,
   },
@@ -296,6 +301,7 @@ const DEMO_CARDS = [
     tags: ["habits", "excellence", "character"],
     note: "Counter to the Stoic emphasis on momentary choice?",
     collectionIds: [],
+    starred: false,
     createdAt: NOW() - 864e5 * 8,
     lastSeenAt: undefined,
   },
@@ -309,6 +315,7 @@ const DEMO_CARDS = [
     tags: ["reading", "life", "imagination"],
     note: "",
     collectionIds: [],
+    starred: false,
     createdAt: NOW() - 864e5 * 5,
     lastSeenAt: undefined,
   },
@@ -321,6 +328,7 @@ const DEMO_CARDS = [
     tags: ["writing", "drafts", "craft"],
     note: "Permission slip for every writer.",
     collectionIds: [],
+    starred: false,
     createdAt: NOW() - 864e5 * 3,
     lastSeenAt: undefined,
   },
@@ -334,6 +342,7 @@ const DEMO_CARDS = [
     tags: ["habits", "systems", "goals"],
     note: "",
     collectionIds: [],
+    starred: false,
     createdAt: NOW() - 864e5,
     lastSeenAt: undefined,
   },
@@ -588,6 +597,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
   const [cmdQuery, setCmdQuery] = useState("");
   const [pastePrompt, setPastePrompt] = useState<string | null>(null);
   const [randomCard, setRandomCard] = useState<any>(null);
+  const [showMorningCard, setShowMorningCard] = useState(false);
   const [savedCardId, setSavedCardId] = useState<string | null>(null);
   const [tagDrawer, setTagDrawer] = useState<any>(null);
 
@@ -649,46 +659,12 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
     load();
   }, [userId]);
 
-  // Welcome-back digest: once when user has cards but no messages (e.g. returning login)
+  // Show morning card when user returns with cards but no messages
   useEffect(() => {
     if (cardsLoading || cards.length === 0 || messages.length > 0 || welcomeDigestTriggeredRef.current) return;
     welcomeDigestTriggeredRef.current = true;
-
-    const runWelcomeDigest = async () => {
-      const count = cards.length;
-      setMessages((p) => [
-        ...p,
-        mkMsg("assistant", {
-          type: "text",
-          text: `Welcome back — your library has ${count} card${count !== 1 ? "s" : ""}. Here's what's worth reading today:`,
-        }),
-      ]);
-      setLoading(true);
-      setLL("curating today's cards…");
-      const ctrl = new AbortController();
-      try {
-        const result = await generateDigest(cards, ctrl.signal);
-        if (result?.cards?.length) {
-          result.cards.forEach((c: { id: string }) => markCardSeen(c.id));
-          setMessages((p) => [...p, mkMsg("assistant", { type: "digest", framing: result.framing, cards: result.cards })]);
-        } else {
-          setMessages((p) => [
-            ...p,
-            mkMsg("assistant", { type: "text", text: "Type / to see what you can do." }),
-          ]);
-        }
-      } catch {
-        setMessages((p) => [
-          ...p,
-          mkMsg("assistant", { type: "text", text: "Type / to see what you can do." }),
-        ]);
-      } finally {
-        setLoading(false);
-        setLL("");
-      }
-    };
-    runWelcomeDigest();
-  }, [cardsLoading, cards.length, messages.length, userId]);
+    setShowMorningCard(true);
+  }, [cardsLoading, cards.length, messages.length]);
 
   // Persist collections, themes, dark to localStorage when storageLoaded
   useEffect(() => {
@@ -710,6 +686,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
       if (patch.author !== undefined) up.author = patch.author;
       if (patch.year !== undefined) up.year = patch.year;
       if (patch.note !== undefined) up.note = patch.note;
+      if (patch.starred !== undefined) up.starred = patch.starred;
       if (Object.keys(up).length)
         supabase
           .from("notecards")
@@ -931,6 +908,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
         tags,
         note: "",
         collectionIds: [],
+        starred: false,
         createdAt: NOW(),
         lastSeenAt: NOW(),
       };
@@ -965,6 +943,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
       tags: (q.tags ?? []).map((t: string) => cleanTag(t)).filter(Boolean),
       note: "",
       collectionIds: [],
+      starred: false,
       createdAt: NOW(),
       lastSeenAt: NOW(),
     }));
@@ -1224,11 +1203,11 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
   }, [messages, loading]);
 
   useEffect(() => {
-    document.body.style.overflow = showLibrary || showExport || !!randomCard ? "hidden" : "";
+    document.body.style.overflow = showLibrary || showExport || !!randomCard || showMorningCard ? "hidden" : "";
     return () => {
       document.body.style.overflow = "";
     };
-  }, [showLibrary, showExport, randomCard]);
+  }, [showLibrary, showExport, randomCard, showMorningCard]);
 
   useEffect(() => () => {
     abortRef.current?.abort();
@@ -1310,6 +1289,13 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
             card={randomCard}
             onNext={nextRandom}
             onClose={() => setRandomCard(null)}
+          />
+        )}
+        {showMorningCard && (
+          <MorningCard
+            cards={cards}
+            onUpdate={updateCard}
+            onDismiss={() => setShowMorningCard(false)}
           />
         )}
         {showExport && (
