@@ -28,6 +28,8 @@ import {
   ChevronUp,
   Star,
   ArrowRight,
+  LayoutList,
+  Share2,
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -1593,6 +1595,7 @@ export const NoteCard = memo(function NoteCard({
   const [showDetail, setShowDetail] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [showShare, setShowShare] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [pulse, setPulse] = useState(justSaved);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -1651,6 +1654,9 @@ export const NoteCard = memo(function NoteCard({
           onClose={() => setShowDetail(false)}
           inputContainerRef={inputContainerRef}
         />
+      )}
+      {showShare && (
+        <ShareCardModal card={card} onClose={() => setShowShare(false)} />
       )}
       <div
         onMouseEnter={() => setHovered(true)}
@@ -1756,6 +1762,32 @@ export const NoteCard = memo(function NoteCard({
                   animation: "fadeIn 0.12s ease",
                 }}
               >
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowMenu(false);
+                    setShowShare(true);
+                  }}
+                  style={{
+                    width: "100%",
+                    textAlign: "left",
+                    padding: "10px 16px",
+                    background: "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: 13,
+                    fontFamily: FONT_SANS,
+                    color: C.secondary,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = C.surface)}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                >
+                  <Share2 size={12} /> Share card
+                </button>
                 <button
                   type="button"
                   onClick={(e) => {
@@ -3390,23 +3422,410 @@ export const ContextDivider = memo(function ContextDivider({
   );
 });
 
-export const RandomCard = memo(function RandomCard({
+// ─── ShareCardModal ──────────────────────────────────────────────────────────
+function renderCardToCanvas(
+  card: CardLike,
+  C: Theme,
+  scale = 2
+): HTMLCanvasElement {
+  const W = 600;
+  const H = 800;
+  const canvas = document.createElement("canvas");
+  canvas.width = W * scale;
+  canvas.height = H * scale;
+  const ctx = canvas.getContext("2d")!;
+  ctx.scale(scale, scale);
+
+  // Background
+  ctx.fillStyle = C === DARK ? "#1a1917" : "#faf8f4";
+  ctx.fillRect(0, 0, W, H);
+
+  // Subtle border
+  ctx.strokeStyle = C === DARK ? "#2a2925" : "#e8e5df";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
+
+  const pad = 60;
+  const textW = W - pad * 2;
+
+  // Top decorative rule
+  ctx.fillStyle = C === DARK ? "#3a3834" : "#d4d1cb";
+  ctx.fillRect(W / 2 - 16, 80, 32, 1);
+
+  // Open-quote glyph
+  ctx.fillStyle = C === DARK ? "#3a3834" : "#d4d1cb";
+  ctx.font = `60px "Playfair Display", Georgia, serif`;
+  ctx.textAlign = "center";
+  ctx.fillText("\u201C", W / 2, 130);
+
+  // Quote text — word-wrap
+  const quoteSize = card.quote.length > 300 ? 20 : card.quote.length > 150 ? 24 : 28;
+  ctx.font = `400 ${quoteSize}px "Playfair Display", Georgia, serif`;
+  ctx.fillStyle = C === DARK ? "#f0ede8" : "#1a1917";
+  ctx.textAlign = "center";
+
+  const words = card.quote.split(/\s+/);
+  const lines: string[] = [];
+  let currentLine = "";
+  for (const word of words) {
+    const testLine = currentLine ? `${currentLine} ${word}` : word;
+    if (ctx.measureText(testLine).width > textW) {
+      if (currentLine) lines.push(currentLine);
+      currentLine = word;
+    } else {
+      currentLine = testLine;
+    }
+  }
+  if (currentLine) lines.push(currentLine);
+
+  const lineHeight = quoteSize * 1.65;
+  const quoteBlockH = lines.length * lineHeight;
+  const quoteStartY = Math.max(160, (H - quoteBlockH) / 2 - 60);
+
+  lines.forEach((line, i) => {
+    ctx.fillText(line, W / 2, quoteStartY + i * lineHeight);
+  });
+
+  const afterQuote = quoteStartY + quoteBlockH + 30;
+
+  // Divider rule
+  ctx.fillStyle = C === DARK ? "#3a3834" : "#d4d1cb";
+  ctx.fillRect(W / 2 - 12, afterQuote, 24, 1);
+
+  // Book title
+  const metaY = afterQuote + 36;
+  ctx.font = `700 11px "DM Sans", "Inter", system-ui, sans-serif`;
+  ctx.fillStyle = C === DARK ? "#c4c2bc" : "#3a3a38";
+  ctx.textAlign = "center";
+  ctx.fillText(card.book.toUpperCase(), W / 2, metaY);
+
+  // Author
+  if (card.author) {
+    ctx.font = `400 13px "DM Sans", "Inter", system-ui, sans-serif`;
+    ctx.fillStyle = C === DARK ? "#787874" : "#787874";
+    const authorText =
+      card.author + (card.year != null ? ` \u00B7 ${fmtYear(card.year)}` : "");
+    ctx.fillText(authorText, W / 2, metaY + 22);
+  }
+
+  // Watermark
+  ctx.font = `500 9px "DM Sans", "Inter", system-ui, sans-serif`;
+  ctx.fillStyle = C === DARK ? "#2a2925" : "#d4d1cb";
+  ctx.textAlign = "center";
+  ctx.fillText("notecards", W / 2, H - 30);
+
+  return canvas;
+}
+
+export const ShareCardModal = memo(function ShareCardModal({
   card,
-  onNext,
   onClose,
 }: {
   card: CardLike;
-  onNext: () => void;
   onClose: () => void;
 }) {
   const C = useC();
   const T = makeT(C);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
+  const [copied, setCopied] = useState<"image" | "text" | null>(null);
   const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const t = requestAnimationFrame(() => setVisible(true));
+    return () => cancelAnimationFrame(t);
+  }, []);
+
+  useKey("Escape", onClose, [onClose]);
+
+  useEffect(() => {
+    const canvas = renderCardToCanvas(card, C);
+    canvasRef.current = canvas;
+    if (previewRef.current) {
+      previewRef.current.innerHTML = "";
+      const display = canvas.cloneNode(true) as HTMLCanvasElement;
+      const dCtx = display.getContext("2d")!;
+      dCtx.drawImage(canvas, 0, 0);
+      display.style.width = "100%";
+      display.style.height = "auto";
+      display.style.borderRadius = "8px";
+      display.style.boxShadow = "0 8px 40px rgba(0,0,0,0.12)";
+      previewRef.current.appendChild(display);
+    }
+  }, [card, C]);
+
+  const copyImage = async () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    try {
+      const blob = await new Promise<Blob>((resolve, reject) =>
+        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("no blob"))), "image/png")
+      );
+      await navigator.clipboard.write([
+        new ClipboardItem({ "image/png": blob }),
+      ]);
+      setCopied("image");
+      setTimeout(() => setCopied(null), 2000);
+    } catch {
+      // Fallback: copy text instead
+      copyText();
+    }
+  };
+
+  const downloadImage = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const link = document.createElement("a");
+    link.download = `notecard-${card.book.replace(/\s+/g, "-").toLowerCase()}.png`;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+  };
+
+  const copyText = async () => {
+    const text = `"${card.quote}"\n\n\u2014 ${card.book}${card.author ? `, ${card.author}` : ""}`;
+    await navigator.clipboard.writeText(text);
+    setCopied("text");
+    setTimeout(() => setCopied(null), 2000);
+  };
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 300,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 32,
+        fontFamily: FONT_SANS,
+        background: C.base,
+        opacity: visible ? 1 : 0,
+        transition: "opacity 0.3s ease",
+      }}
+    >
+      {/* Close button */}
+      <button
+        onClick={onClose}
+        style={{
+          position: "absolute",
+          top: 20,
+          left: "50%",
+          transform: "translateX(-50%)",
+          padding: "8px 16px",
+          borderRadius: 99,
+          border: `1px solid ${C.border}`,
+          background: "transparent",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 6,
+          fontSize: 13,
+          fontFamily: FONT_SANS,
+          fontWeight: 500,
+          color: C.faint,
+          transition: "all 0.15s",
+          zIndex: 10,
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.color = C.ink;
+          e.currentTarget.style.borderColor = C.borderHover;
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.color = C.faint;
+          e.currentTarget.style.borderColor = C.border;
+        }}
+      >
+        <X size={13} />
+        Close
+      </button>
+
+      <div
+        style={{
+          maxWidth: 380,
+          width: "100%",
+          opacity: visible ? 1 : 0,
+          transform: visible ? "translateY(0)" : "translateY(14px)",
+          transition: "opacity 0.4s ease 0.1s, transform 0.4s ease 0.1s",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+        }}
+      >
+        {/* Label */}
+        <p
+          style={{
+            ...T.label,
+            marginBottom: 20,
+          }}
+        >
+          Share a Card
+        </p>
+
+        {/* Canvas preview */}
+        <div
+          ref={previewRef}
+          style={{
+            width: "100%",
+            marginBottom: 28,
+          }}
+        />
+
+        {/* Action buttons */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            flexWrap: "wrap",
+            justifyContent: "center",
+          }}
+        >
+          <button
+            type="button"
+            onClick={copyImage}
+            style={{
+              background: C.ink,
+              color: C.base,
+              border: "none",
+              borderRadius: R.pill,
+              cursor: "pointer",
+              padding: "9px 20px",
+              display: "flex",
+              alignItems: "center",
+              gap: 7,
+              fontSize: 13,
+              fontFamily: FONT_SANS,
+              fontWeight: 500,
+              transition: "all 0.15s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = C.secondary)}
+            onMouseLeave={(e) => (e.currentTarget.style.background = C.ink)}
+          >
+            {copied === "image" ? (
+              <>
+                <Check size={13} /> Copied!
+              </>
+            ) : (
+              <>
+                <Copy size={13} /> Copy image
+              </>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={downloadImage}
+            style={{
+              background: "transparent",
+              color: C.secondary,
+              border: `1px solid ${C.border}`,
+              borderRadius: R.pill,
+              cursor: "pointer",
+              padding: "8px 18px",
+              display: "flex",
+              alignItems: "center",
+              gap: 7,
+              fontSize: 13,
+              fontFamily: FONT_SANS,
+              fontWeight: 500,
+              transition: "all 0.15s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = C.borderHover;
+              e.currentTarget.style.color = C.ink;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = C.border;
+              e.currentTarget.style.color = C.secondary;
+            }}
+          >
+            <Download size={13} /> Download
+          </button>
+          <button
+            type="button"
+            onClick={copyText}
+            style={{
+              background: "transparent",
+              color: C.muted,
+              border: `1px solid ${C.border}`,
+              borderRadius: R.pill,
+              cursor: "pointer",
+              padding: "8px 18px",
+              display: "flex",
+              alignItems: "center",
+              gap: 7,
+              fontSize: 13,
+              fontFamily: FONT_SANS,
+              fontWeight: 500,
+              transition: "all 0.15s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = C.borderHover;
+              e.currentTarget.style.color = C.ink;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = C.border;
+              e.currentTarget.style.color = C.muted;
+            }}
+          >
+            {copied === "text" ? (
+              <>
+                <Check size={13} /> Copied!
+              </>
+            ) : (
+              <>
+                <FileText size={13} /> Copy text
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+export const RandomCard = memo(function RandomCard({
+  card,
+  onNext,
+  onClose,
+  onUpdate,
+}: {
+  card: CardLike;
+  onNext: () => void;
+  onClose: () => void;
+  onUpdate?: (id: string, patch: Partial<CardLike>) => void;
+}) {
+  const C = useC();
+  const T = makeT(C);
+  const [visible, setVisible] = useState(false);
+  const [showReflect, setShowReflect] = useState(false);
+  const [showShare, setShowShare] = useState(false);
+  const [newThought, setNewThought] = useState("");
   useEffect(() => {
     const t = requestAnimationFrame(() => setVisible(true));
     return () => cancelAnimationFrame(t);
   }, [card.id]);
+  useEffect(() => {
+    setShowReflect(false);
+    setNewThought("");
+  }, [card.id]);
   useKey("Escape", onClose, [onClose]);
+
+  const submitReflection = () => {
+    if (!newThought.trim() || !onUpdate) return;
+    const now = new Date();
+    const monthYear = now.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+    const combined = card.note
+      ? `${card.note}\n\n\u2014 ${monthYear}\n${newThought.trim()}`
+      : newThought.trim();
+    onUpdate(card.id, { note: combined });
+    setNewThought("");
+    setShowReflect(false);
+  };
+
   return (
     <div
       role="dialog"
@@ -3502,19 +3921,94 @@ export const RandomCard = memo(function RandomCard({
             </p>
           )}
           {card.note && (
-            <p
+            <div style={{ marginTop: 20, maxWidth: 420, margin: "20px auto 0" }}>
+              <p
+                style={{
+                  fontSize: 11,
+                  fontWeight: 500,
+                  color: C.faint,
+                  textTransform: "uppercase" as const,
+                  letterSpacing: "0.05em",
+                  marginBottom: 8,
+                }}
+              >
+                Your earlier reflection:
+              </p>
+              <p
+                style={{
+                  fontSize: 14,
+                  color: C.muted,
+                  lineHeight: 1.8,
+                  fontFamily: FONT_SERIF,
+                  whiteSpace: "pre-line",
+                }}
+              >
+                {card.note}
+              </p>
+            </div>
+          )}
+          {card.note && !showReflect && onUpdate && (
+            <button
+              onClick={() => setShowReflect(true)}
               style={{
-                fontSize: 14,
-                color: C.muted,
-                marginTop: 16,
-                maxWidth: 400,
-                margin: "16px auto 0",
-                lineHeight: 1.8,
-                fontFamily: FONT_SERIF,
+                marginTop: 12,
+                fontSize: 13,
+                color: C.faint,
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                fontFamily: FONT_SANS,
+                transition: "color 0.15s",
               }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = C.secondary)}
+              onMouseLeave={(e) => (e.currentTarget.style.color = C.faint)}
             >
-              "{card.note}"
-            </p>
+              Add a new thought
+            </button>
+          )}
+          {showReflect && onUpdate && (
+            <div style={{ marginTop: 16, maxWidth: 420, margin: "16px auto 0" }}>
+              <textarea
+                autoFocus
+                value={newThought}
+                onChange={(e) => setNewThought(e.target.value)}
+                placeholder="What do you think now?"
+                rows={3}
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  fontSize: 13,
+                  fontFamily: FONT_SERIF,
+                  lineHeight: 1.7,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: R.md,
+                  background: "transparent",
+                  color: C.ink,
+                  outline: "none",
+                  resize: "vertical",
+                  transition: "border-color 0.15s",
+                }}
+                onFocus={(e) => (e.currentTarget.style.borderColor = C.ink)}
+                onBlur={(e) => (e.currentTarget.style.borderColor = C.border)}
+              />
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8 }}>
+                <Btn
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => { setShowReflect(false); setNewThought(""); }}
+                >
+                  Cancel
+                </Btn>
+                <Btn
+                  variant="outline"
+                  size="sm"
+                  onClick={submitReflection}
+                  disabled={!newThought.trim()}
+                >
+                  <Check size={12} /> Save
+                </Btn>
+              </div>
+            </div>
           )}
           <div
             style={{
@@ -3530,12 +4024,18 @@ export const RandomCard = memo(function RandomCard({
             ))}
           </div>
         </div>
-        <div style={{ display: "flex", justifyContent: "center" }}>
+        <div style={{ display: "flex", justifyContent: "center", gap: 10 }}>
           <Btn variant="outline" size="sm" onClick={onNext}>
             <Shuffle size={12} /> Another one
           </Btn>
+          <Btn variant="outline" size="sm" onClick={() => setShowShare(true)}>
+            <Share2 size={12} /> Share
+          </Btn>
         </div>
       </div>
+      {showShare && (
+        <ShareCardModal card={card} onClose={() => setShowShare(false)} />
+      )}
     </div>
   );
 });
@@ -3553,6 +4053,9 @@ export const MorningCard = memo(function MorningCard({
   const C = useC();
   const T = makeT(C);
   const [visible, setVisible] = useState(false);
+  const [showReflectM, setShowReflectM] = useState(false);
+  const [showShareM, setShowShareM] = useState(false);
+  const [newThoughtM, setNewThoughtM] = useState("");
 
   const card = useMemo(() => {
     if (!cards.length) return null;
@@ -3575,6 +4078,18 @@ export const MorningCard = memo(function MorningCard({
   }, []);
 
   useKey("Escape", onDismiss, [onDismiss]);
+
+  const submitMorningReflection = () => {
+    if (!newThoughtM.trim() || !card) return;
+    const now = new Date();
+    const monthYear = now.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+    const combined = card.note
+      ? `${card.note}\n\n\u2014 ${monthYear}\n${newThoughtM.trim()}`
+      : newThoughtM.trim();
+    onUpdate(card.id, { note: combined });
+    setNewThoughtM("");
+    setShowReflectM(false);
+  };
 
   if (!card) { onDismiss(); return null; }
 
@@ -3642,25 +4157,102 @@ export const MorningCard = memo(function MorningCard({
           )}
         </div>
 
-        {/* Annotation */}
+        {/* Annotation with evolving reflections */}
         {card.note && (
-          <p
+          <div style={{ maxWidth: 420, width: "100%", marginBottom: 12 }}>
+            <p
+              style={{
+                fontSize: 11,
+                fontWeight: 500,
+                color: C.faint,
+                textTransform: "uppercase" as const,
+                letterSpacing: "0.05em",
+                marginBottom: 8,
+                textAlign: "center",
+              }}
+            >
+              Your earlier reflection:
+            </p>
+            <p
+              style={{
+                fontSize: 14,
+                color: C.muted,
+                textAlign: "center",
+                lineHeight: 1.8,
+                fontFamily: FONT_SERIF,
+                fontStyle: "italic",
+                padding: "16px 20px",
+                borderLeft: `2px solid ${C.border}`,
+                borderRight: `2px solid ${C.border}`,
+                whiteSpace: "pre-line",
+              }}
+            >
+              {card.note}
+            </p>
+          </div>
+        )}
+        {card.note && !showReflectM && (
+          <button
+            onClick={() => setShowReflectM(true)}
             style={{
-              fontSize: 14,
-              color: C.muted,
-              maxWidth: 420,
-              textAlign: "center",
-              lineHeight: 1.8,
-              fontFamily: FONT_SERIF,
-              fontStyle: "italic",
-              marginBottom: 28,
-              padding: "16px 20px",
-              borderLeft: `2px solid ${C.border}`,
-              borderRight: `2px solid ${C.border}`,
+              marginBottom: 20,
+              fontSize: 13,
+              color: C.faint,
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              fontFamily: FONT_SANS,
+              transition: "color 0.15s",
             }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = C.secondary)}
+            onMouseLeave={(e) => (e.currentTarget.style.color = C.faint)}
           >
-            {card.note}
-          </p>
+            Add a new thought
+          </button>
+        )}
+        {showReflectM && (
+          <div style={{ maxWidth: 420, width: "100%", marginBottom: 20 }}>
+            <textarea
+              autoFocus
+              value={newThoughtM}
+              onChange={(e) => setNewThoughtM(e.target.value)}
+              placeholder="What do you think now?"
+              rows={3}
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                fontSize: 13,
+                fontFamily: FONT_SERIF,
+                lineHeight: 1.7,
+                border: `1px solid ${C.border}`,
+                borderRadius: R.md,
+                background: "transparent",
+                color: C.ink,
+                outline: "none",
+                resize: "vertical",
+                transition: "border-color 0.15s",
+              }}
+              onFocus={(e) => (e.currentTarget.style.borderColor = C.ink)}
+              onBlur={(e) => (e.currentTarget.style.borderColor = C.border)}
+            />
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8 }}>
+              <Btn
+                variant="ghost"
+                size="sm"
+                onClick={() => { setShowReflectM(false); setNewThoughtM(""); }}
+              >
+                Cancel
+              </Btn>
+              <Btn
+                variant="outline"
+                size="sm"
+                onClick={submitMorningReflection}
+                disabled={!newThoughtM.trim()}
+              >
+                <Check size={12} /> Save
+              </Btn>
+            </div>
+          </div>
         )}
 
         {/* Tags */}
@@ -3706,6 +4298,35 @@ export const MorningCard = memo(function MorningCard({
           </button>
           <button
             type="button"
+            onClick={() => setShowShareM(true)}
+            style={{
+              background: "none",
+              border: `1px solid ${C.border}`,
+              borderRadius: R.pill,
+              cursor: "pointer",
+              padding: "8px 16px",
+              color: C.faint,
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 13,
+              fontFamily: FONT_SANS,
+              fontWeight: 500,
+              transition: "all 0.15s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = C.borderHover;
+              e.currentTarget.style.color = C.ink;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = C.border;
+              e.currentTarget.style.color = C.faint;
+            }}
+          >
+            <Share2 size={14} /> Share
+          </button>
+          <button
+            type="button"
             onClick={onDismiss}
             style={{
               background: "none",
@@ -3735,6 +4356,9 @@ export const MorningCard = memo(function MorningCard({
           </button>
         </div>
       </div>
+      {showShareM && (
+        <ShareCardModal card={card} onClose={() => setShowShareM(false)} />
+      )}
     </div>
   );
 });
