@@ -190,6 +190,27 @@ export const cleanTag = (v: string): string =>
     .replace(/[^a-z0-9-]/g, "");
 export const fmtYear = (y: number | null | undefined): string =>
   !y ? "" : y < 0 ? `${Math.abs(y)} BCE` : String(y);
+
+function timeAgo(createdAt?: number): string {
+  if (!createdAt) return "";
+  const diff = Date.now() - createdAt;
+  const days = diff / 86400000;
+  if (days < 1) return "Saved today";
+  if (days < 7) return "Saved this week";
+  if (days < 30) return "Saved this month";
+  if (days < 365) {
+    const month = new Date(createdAt).toLocaleDateString("en-US", { month: "long" });
+    return `Saved in ${month}`;
+  }
+  const years = Math.floor(days / 365);
+  return years === 1 ? "Saved a year ago" : `Saved ${years} years ago`;
+}
+
+function timeAgoExact(createdAt?: number): string {
+  if (!createdAt) return "";
+  return `Saved on ${new Date(createdAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`;
+}
+
 export const uid = (): string =>
   Math.random().toString(36).slice(2, 9) + Date.now().toString(36);
 const NOW = () => Date.now();
@@ -1250,6 +1271,11 @@ const CardDetailDrawer = memo(function CardDetailDrawer({
 
         {/* Scrollable content */}
         <div style={{ flex: 1, overflowY: "auto", padding: mob ? "0 16px" : "0 28px" }}>
+          {card.createdAt && (
+            <p style={{ fontSize: 11, color: C.faint, fontFamily: FONT_SANS, marginBottom: 12 }}>
+              {timeAgoExact(card.createdAt)}
+            </p>
+          )}
           {/* ── Quote section ── */}
           {sectionHeader("quote", "Quote", card.quote.length > 40 ? card.quote.slice(0, 40) + "…" : card.quote)}
           {expandedSection === "quote" && (
@@ -1875,6 +1901,12 @@ export const NoteCard = memo(function NoteCard({
             <Tag key={t}>{t}</Tag>
           ))}
         </div>
+
+        {!selectable && card.createdAt && (
+          <p style={{ fontSize: 11, color: C.faint, marginTop: 8, fontFamily: FONT_SANS }}>
+            {timeAgo(card.createdAt)}
+          </p>
+        )}
 
         {!selectable && card.note && (
           <div style={{ marginTop: 12 }}>
@@ -3698,6 +3730,17 @@ export const RandomCard = memo(function RandomCard({
               {card.year != null ? ` · ${fmtYear(card.year)}` : ""}
             </p>
           )}
+          {card.createdAt && (
+            <p style={{
+              fontSize: 12,
+              color: C.faint,
+              fontFamily: FONT_SANS,
+              fontStyle: "italic",
+              marginTop: 12,
+            }}>
+              {timeAgo(card.createdAt)}
+            </p>
+          )}
           {card.note && (
             <div style={{ marginTop: 20, maxWidth: 420, margin: "20px auto 0" }}>
               <p
@@ -3861,13 +3904,180 @@ export function WelcomeCard({ onDismiss }: { onDismiss: () => void }) {
   );
 }
 
+// ─── CurrentlyReading ────────────────────────────────────────────────────────
+export function CurrentlyReading({ books }: { books: { book: string; count: number }[] }) {
+  const C = useC();
+  const mob = useContext(MobileCtx);
+  if (!books.length) return null;
+  return (
+    <div style={{ padding: mob ? "16px 0" : "20px 0", animation: "fadeIn 0.5s ease both" }}>
+      <p style={{
+        fontFamily: FONT_SERIF,
+        fontSize: 11,
+        fontWeight: 500,
+        color: C.faint,
+        textTransform: "uppercase" as const,
+        letterSpacing: "0.08em",
+        marginBottom: 12,
+      }}>
+        Currently reading
+      </p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {books.map((b) => (
+          <div key={b.book} style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+            <span style={{
+              fontFamily: FONT_SERIF,
+              fontSize: mob ? 14 : 15,
+              color: C.ink,
+              fontStyle: "italic",
+            }}>
+              {b.book}
+            </span>
+            <span style={{ fontSize: 11, color: C.faint, fontFamily: FONT_SANS }}>
+              {b.count} {b.count === 1 ? "quote" : "quotes"} this week
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── ReflectionNudge ─────────────────────────────────────────────────────────
+export function ReflectionNudge({ book, count, onSit, onDismiss }: {
+  book: string;
+  count: number;
+  onSit: () => void;
+  onDismiss: () => void;
+}) {
+  const C = useC();
+  const mob = useContext(MobileCtx);
+  return (
+    <div style={{
+      padding: mob ? "14px 0" : "18px 0",
+      animation: "fadeIn 0.5s ease both",
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+      flexWrap: "wrap",
+    }}>
+      <p style={{
+        fontSize: mob ? 13 : 14,
+        color: C.muted,
+        fontFamily: FONT_SANS,
+        lineHeight: 1.5,
+        flex: 1,
+        minWidth: 200,
+      }}>
+        You've saved {count} quotes from{" "}
+        <span style={{ fontFamily: FONT_SERIF, fontStyle: "italic", color: C.ink }}>{book}</span>
+        {" "}this week.
+      </p>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <button
+          onClick={onSit}
+          style={{
+            fontSize: 13,
+            fontFamily: FONT_SANS,
+            fontWeight: 500,
+            color: C.sage,
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            padding: "4px 0",
+          }}
+        >
+          Sit with them →
+        </button>
+        <button
+          onClick={onDismiss}
+          style={{
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            color: C.faint,
+            padding: "4px 8px",
+            display: "flex",
+            alignItems: "center",
+          }}
+        >
+          <X size={13} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── MilestoneCard ───────────────────────────────────────────────────────────
+const QUOTE_MILESTONES = [10, 25, 50, 100, 250, 500];
+const BOOK_MILESTONES = [5, 10, 25];
+
+export function MilestoneCard({ totalQuotes, totalBooks, onDismiss }: {
+  totalQuotes: number;
+  totalBooks: number;
+  onDismiss: () => void;
+}) {
+  const C = useC();
+  const mob = useContext(MobileCtx);
+  const quoteMilestone = QUOTE_MILESTONES.includes(totalQuotes) ? totalQuotes : null;
+  const bookMilestone = BOOK_MILESTONES.includes(totalBooks) ? totalBooks : null;
+  const milestone = quoteMilestone || bookMilestone;
+  if (!milestone) return null;
+
+  const heading = quoteMilestone
+    ? `${totalQuotes} quotes saved.`
+    : `${totalBooks} books in your library.`;
+  const sub = quoteMilestone
+    ? `From ${totalBooks} ${totalBooks === 1 ? "book" : "books"}. Your library is growing.`
+    : `${totalQuotes} quotes across ${totalBooks} books. A real collection.`;
+
+  useEffect(() => {
+    const t = setTimeout(onDismiss, 10000);
+    return () => clearTimeout(t);
+  }, [onDismiss]);
+
+  return (
+    <div
+      onClick={onDismiss}
+      style={{
+        padding: mob ? "28px 0" : "40px 0",
+        animation: "fadeIn 0.6s ease both",
+        textAlign: "center",
+        cursor: "pointer",
+      }}
+    >
+      <div style={{ width: 24, height: 1, background: C.border, margin: "0 auto 24px" }} />
+      <p style={{
+        fontFamily: FONT_SERIF,
+        fontSize: mob ? 20 : 24,
+        fontWeight: 400,
+        color: C.ink,
+        marginBottom: 8,
+        fontStyle: "italic",
+      }}>
+        {heading}
+      </p>
+      <p style={{
+        fontSize: 13,
+        color: C.muted,
+        fontFamily: FONT_SANS,
+      }}>
+        {sub}
+      </p>
+      <div style={{ width: 24, height: 1, background: C.border, margin: "24px auto 0" }} />
+    </div>
+  );
+}
+
 // ─── MorningCard ──────────────────────────────────────────────────────────────
 export const MorningCard = memo(function MorningCard({
   cards,
   onUpdate,
+  currentlyReading,
 }: {
   cards: CardLike[];
   onUpdate: (id: string, patch: Partial<CardLike>) => void;
+  currentlyReading?: string[];
 }) {
   const C = useC();
   const mob = useContext(MobileCtx); const T = makeT(C, mob);
@@ -3885,11 +4095,12 @@ export const MorningCard = memo(function MorningCard({
       const age = now - (c.lastSeenAt ?? c.createdAt ?? 0);
       const stale = age > sevenDays ? 3 : age > 864e5 * 3 ? 2 : 1;
       const starBonus = c.starred ? 2 : 1;
-      return { card: c, score: stale * starBonus + Math.random() * 0.5 };
+      const readingBonus = currentlyReading?.includes(c.book) ? 1.3 : 1;
+      return { card: c, score: stale * starBonus * readingBonus + Math.random() * 0.5 };
     });
     scored.sort((a, b) => b.score - a.score);
     return scored[0]?.card ?? null;
-  }, [cards]);
+  }, [cards, currentlyReading]);
 
   useEffect(() => {
     const t = requestAnimationFrame(() => setVisible(true));
@@ -3967,6 +4178,19 @@ export const MorningCard = memo(function MorningCard({
             </p>
           )}
         </div>
+
+        {card.createdAt && (
+          <p style={{
+            fontSize: 12,
+            color: C.faint,
+            fontFamily: FONT_SANS,
+            fontStyle: "italic",
+            marginBottom: 20,
+            textAlign: "center",
+          }}>
+            {timeAgo(card.createdAt)}
+          </p>
+        )}
 
         {/* Annotation with evolving reflections */}
         {card.note && (
