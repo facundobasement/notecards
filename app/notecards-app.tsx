@@ -36,6 +36,9 @@ import {
   BookPalette,
   MorningCard,
   WelcomeCard,
+  CurrentlyReading,
+  ReflectionNudge,
+  MilestoneCard,
   AccountPanel,
   type UserMeta,
 } from "./notecards-components";
@@ -558,13 +561,65 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
   const [savedCardId, setSavedCardId] = useState<string | null>(null);
   const [tagDrawer, setTagDrawer] = useState<any>(null);
   const [undoToast, setUndoToast] = useState<{ card: any; timer: ReturnType<typeof setTimeout> } | null>(null);
+  const [milestone, setMilestone] = useState<{ quotes: number; books: number } | null>(null);
+  const [nudgeDismissed, setNudgeDismissed] = useState(false);
 
   const C = dark ? DARK : LIGHT;
+
+  // Companion features: derived state
+  const currentlyReading = useMemo(() => {
+    const twoWeeksAgo = Date.now() - 14 * 86400000;
+    const bookMap = new Map<string, { count: number; latest: number }>();
+    for (const c of cards) {
+      const t = c.createdAt ?? 0;
+      if (t > twoWeeksAgo) {
+        const prev = bookMap.get(c.book);
+        bookMap.set(c.book, {
+          count: (prev?.count ?? 0) + 1,
+          latest: Math.max(prev?.latest ?? 0, t),
+        });
+      }
+    }
+    return [...bookMap.entries()]
+      .sort((a, b) => b[1].latest - a[1].latest)
+      .slice(0, 3)
+      .map(([book, { count }]) => ({ book, count }));
+  }, [cards]);
+
+  const reflectionNudge = useMemo(() => {
+    if (nudgeDismissed) return null;
+    const oneWeekAgo = Date.now() - 7 * 86400000;
+    const bookCounts = new Map<string, number>();
+    for (const c of cards) {
+      if ((c.createdAt ?? 0) > oneWeekAgo) {
+        bookCounts.set(c.book, (bookCounts.get(c.book) ?? 0) + 1);
+      }
+    }
+    let best: { book: string; count: number } | null = null;
+    for (const [book, count] of bookCounts) {
+      if (count >= 3 && (!best || count > best.count)) best = { book, count };
+    }
+    if (!best) return null;
+    // Check weekly dismissal
+    const week = Math.floor(Date.now() / (7 * 86400000));
+    const key = `nc_nudge_${best.book.replace(/\s+/g, "_")}_${week}`;
+    if (typeof window !== "undefined" && localStorage.getItem(key)) return null;
+    return { ...best, dismissKey: key };
+  }, [cards, nudgeDismissed]);
 
   const dismissWelcome = () => {
     localStorage.setItem("nc_onboarding_dismissed_v1", "1");
     setShowWelcome(false);
   };
+
+  const dismissNudge = useCallback(() => {
+    if (reflectionNudge) {
+      localStorage.setItem(reflectionNudge.dismissKey, "1");
+    }
+    setNudgeDismissed(true);
+  }, [reflectionNudge]);
+
+  const dismissMilestone = useCallback(() => setMilestone(null), []);
 
   const cardsRef = useRef(cards);
   const messagesRef = useRef(messages);
@@ -883,6 +938,20 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
       setSavedCardId(card.id);
       setTimeout(() => setSavedCardId(null), 800);
       lastShownIds.current = [card.id];
+      // Check milestones
+      const newTotal = cardsRef.current.length + 1;
+      const newBooks = new Set(cardsRef.current.map((c) => c.book)).add(card.book).size;
+      const QUOTE_M = [10, 25, 50, 100, 250, 500];
+      const BOOK_M = [5, 10, 25];
+      const isQM = QUOTE_M.includes(newTotal);
+      const isBM = BOOK_M.includes(newBooks);
+      if (isQM || isBM) {
+        const key = `nc_milestone_${isQM ? `q${newTotal}` : `b${newBooks}`}`;
+        if (!localStorage.getItem(key)) {
+          localStorage.setItem(key, "1");
+          setMilestone({ quotes: newTotal, books: newBooks });
+        }
+      }
       setMessages((p) =>
         p.map((m) => (m.id === pid ? { ...m, type: "saved", card, liveCard: card } : m))
       );
@@ -1369,6 +1438,29 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
                   <MorningCard
                     cards={cards}
                     onUpdate={updateCard}
+                    currentlyReading={currentlyReading.map((b) => b.book)}
+                  />
+                )}
+                {milestone && (
+                  <MilestoneCard
+                    totalQuotes={milestone.quotes}
+                    totalBooks={milestone.books}
+                    onDismiss={dismissMilestone}
+                  />
+                )}
+                {currentlyReading.length > 0 && !showMorningCard && (
+                  <CurrentlyReading books={currentlyReading} />
+                )}
+                {reflectionNudge && (
+                  <ReflectionNudge
+                    book={reflectionNudge.book}
+                    count={reflectionNudge.count}
+                    onSit={() => {
+                      setInput(`/read ${reflectionNudge.book}`);
+                      dismissNudge();
+                      setTimeout(() => handleSend(), 100);
+                    }}
+                    onDismiss={dismissNudge}
                   />
                 )}
                 {messages.map((m) =>
