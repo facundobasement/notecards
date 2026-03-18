@@ -1114,8 +1114,10 @@ const CardDetailDrawer = memo(function CardDetailDrawer({
   }, []);
 
   useEffect(() => {
+    const scrollbarW = window.innerWidth - document.documentElement.clientWidth;
     document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = ""; };
+    document.body.style.paddingRight = `${scrollbarW}px`;
+    return () => { document.body.style.overflow = ""; document.body.style.paddingRight = ""; };
   }, []);
 
 
