@@ -31,6 +31,20 @@ import {
   Share2,
 } from "lucide-react";
 
+// ─── Mobile ──────────────────────────────────────────────────────────────────
+export function useIsMobile(breakpoint = 640): boolean {
+  const [mobile, setMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${breakpoint}px)`);
+    setMobile(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setMobile(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, [breakpoint]);
+  return mobile;
+}
+export const MobileCtx = createContext(false);
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 export type Theme = Record<string, string>;
 export interface CardLike {
@@ -103,23 +117,23 @@ export const FONT_SERIF =
   "'Playfair Display', 'Libre Baskerville', Georgia, serif";
 export const FONT_SANS = "'DM Sans', 'Inter', system-ui, sans-serif";
 
-export const makeT = (C: Theme): Record<string, React.CSSProperties> => ({
+export const makeT = (C: Theme, isMobile = false): Record<string, React.CSSProperties> => ({
   quoteMain: {
-    fontSize: 20,
+    fontSize: isMobile ? 18 : 20,
     lineHeight: 1.75,
     color: C.ink,
     fontFamily: FONT_SERIF,
     letterSpacing: "0.01em",
   },
   quoteRandom: {
-    fontSize: 32,
-    lineHeight: 1.45,
+    fontSize: isMobile ? 24 : 32,
+    lineHeight: isMobile ? 1.5 : 1.45,
     color: C.ink,
     fontFamily: FONT_SERIF,
     letterSpacing: "-0.02em",
   },
   quoteDisplay: {
-    fontSize: 22,
+    fontSize: isMobile ? 20 : 22,
     lineHeight: 1.5,
     color: C.ink,
     fontFamily: FONT_SERIF,
@@ -298,10 +312,11 @@ export const Btn = memo(function Btn({
   C?: Theme;
 }) {
   const C = CP ?? useC();
+  const mob = useContext(MobileCtx);
   const sz: Record<BtnSize, React.CSSProperties> = {
-    xs: { fontSize: 10, padding: "4px 10px" },
-    sm: { fontSize: 12, padding: "6px 14px" },
-    md: { fontSize: 13, padding: "9px 20px" },
+    xs: { fontSize: mob ? 12 : 10, padding: mob ? "10px 14px" : "4px 10px" },
+    sm: { fontSize: 12, padding: mob ? "12px 16px" : "6px 14px" },
+    md: { fontSize: 13, padding: mob ? "14px 22px" : "9px 20px" },
   };
   const base: Record<BtnVariant, React.CSSProperties> = {
     primary: { background: C.ink, color: C.base, border: "none" },
@@ -579,7 +594,7 @@ export const TagPickerDrawer = memo(function TagPickerDrawer({
   inputContainerRef?: React.RefObject<HTMLDivElement | null>;
 }) {
   const C = useC();
-  const T = makeT(C);
+  const mob = useContext(MobileCtx); const T = makeT(C, mob);
   const [selected, setSelected] = useState([...suggestedTags]);
   const [inp, setInp] = useState("");
   const [visible, setVisible] = useState(false);
@@ -632,8 +647,7 @@ export const TagPickerDrawer = memo(function TagPickerDrawer({
         style={{
           position: "fixed",
           bottom: 0,
-          left: drawerStyle.left ?? 0,
-          width: drawerStyle.width ?? "100%",
+          ...(mob ? { left: 0, width: "100%" } : { left: drawerStyle.left ?? 0, width: drawerStyle.width ?? "100%" }),
           zIndex: 301,
           background: C.base,
           borderTop: `1px solid ${C.border}`,
@@ -667,7 +681,7 @@ export const TagPickerDrawer = memo(function TagPickerDrawer({
         </div>
         <div
           style={{
-            padding: "4px 28px 16px",
+            padding: mob ? "4px 16px 16px" : "4px 28px 16px",
             borderBottom: `1px solid ${C.border}`,
             flexShrink: 0,
           }}
@@ -692,7 +706,7 @@ export const TagPickerDrawer = memo(function TagPickerDrawer({
           style={{
             flex: 1,
             overflowY: "auto",
-            padding: "18px 28px 0",
+            padding: mob ? "18px 16px 0" : "18px 28px 0",
           }}
         >
           <p style={{ ...T.label, marginBottom: 14 }}>Tags</p>
@@ -1057,7 +1071,7 @@ const CardDetailDrawer = memo(function CardDetailDrawer({
   inputContainerRef,
 }: CardDetailDrawerProps) {
   const C = useC();
-  const T = makeT(C);
+  const mob = useContext(MobileCtx); const T = makeT(C, mob);
   const [visible, setVisible] = useState(false);
   const [drawerStyle, setDrawerStyle] = useState<{ left: number; width?: number }>({ left: 0, width: undefined });
 
@@ -1176,9 +1190,11 @@ const CardDetailDrawer = memo(function CardDetailDrawer({
         style={{
           position: "fixed",
           bottom: 0,
-          ...(drawerStyle.width != null
-            ? { left: drawerStyle.left, width: drawerStyle.width }
-            : { left: "50%", maxWidth: 640 - 56, width: "calc(100% - 56px)" }),
+          ...(mob
+            ? { left: 0, width: "100%" }
+            : drawerStyle.width != null
+              ? { left: drawerStyle.left, width: drawerStyle.width }
+              : { left: "50%", maxWidth: 640 - 56, width: "calc(100% - 56px)" }),
           zIndex: 301,
           background: C.base,
           borderTop: `1px solid ${C.border}`,
@@ -1189,9 +1205,11 @@ const CardDetailDrawer = memo(function CardDetailDrawer({
           maxHeight: "80vh",
           display: "flex",
           flexDirection: "column",
-          transform: drawerStyle.width != null
+          transform: mob
             ? (visible ? "translateY(0)" : "translateY(100%)")
-            : (visible ? "translateX(-50%)" : "translateX(-50%) translateY(100%)"),
+            : drawerStyle.width != null
+              ? (visible ? "translateY(0)" : "translateY(100%)")
+              : (visible ? "translateX(-50%)" : "translateX(-50%) translateY(100%)"),
           transition: "transform 0.28s cubic-bezier(0.32,0.72,0,1)",
         }}
       >
@@ -1222,7 +1240,7 @@ const CardDetailDrawer = memo(function CardDetailDrawer({
         </div>
 
         {/* Scrollable content */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "0 28px" }}>
+        <div style={{ flex: 1, overflowY: "auto", padding: mob ? "0 16px" : "0 28px" }}>
           {/* ── Quote section ── */}
           {sectionHeader("quote", "Quote", card.quote.length > 40 ? card.quote.slice(0, 40) + "…" : card.quote)}
           {expandedSection === "quote" && (
@@ -1556,7 +1574,7 @@ export const NoteCard = memo(function NoteCard({
   inputContainerRef,
 }: NoteCardProps) {
   const C = useC();
-  const T = makeT(C);
+  const mob = useContext(MobileCtx); const T = makeT(C, mob);
   const [showDetail, setShowDetail] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -1653,6 +1671,7 @@ export const NoteCard = memo(function NoteCard({
           >
             <button
               type="button"
+              className="nc-action-btn"
               onClick={(e) => {
                 e.stopPropagation();
                 onUpdate(card.id, { starred: !card.starred });
@@ -1661,11 +1680,11 @@ export const NoteCard = memo(function NoteCard({
                 background: "none",
                 border: "none",
                 cursor: "pointer",
-                padding: "2px 4px",
+                padding: mob ? "10px 12px" : "2px 4px",
                 color: card.starred ? C.warmDot : C.faint,
                 display: "flex",
                 alignItems: "center",
-                opacity: card.starred ? 1 : hovered ? 0.6 : 0,
+                opacity: card.starred ? 1 : (mob || hovered) ? 0.6 : 0,
                 transition: "color 0.15s, opacity 0.15s",
               }}
               onMouseEnter={(e) => {
@@ -1684,6 +1703,7 @@ export const NoteCard = memo(function NoteCard({
           >
             <button
               type="button"
+              className="nc-action-btn"
               onClick={(e) => {
                 e.stopPropagation();
                 setShowMenu((v) => !v);
@@ -1692,7 +1712,7 @@ export const NoteCard = memo(function NoteCard({
                 background: "none",
                 border: "none",
                 cursor: "pointer",
-                padding: "2px 4px",
+                padding: mob ? "10px 12px" : "2px 4px",
                 color: C.faint,
                 display: "flex",
                 alignItems: "center",
@@ -1949,7 +1969,7 @@ export const WritePrompts = memo(function WritePrompts({
   cards?: CardLike[];
 } & Omit<NoteCardProps, "card" | "compact">) {
   const C = useC();
-  const T = makeT(C);
+  const mob = useContext(MobileCtx); const T = makeT(C, mob);
   const [show, setShow] = useState(false);
   if (!prompts?.length) return null;
   return (
@@ -2023,7 +2043,7 @@ export const SynthesisBlock = memo(function SynthesisBlock({
   cards: CardLike[];
 } & Omit<NoteCardProps, "card" | "compact">) {
   const C = useC();
-  const T = makeT(C);
+  const mob = useContext(MobileCtx); const T = makeT(C, mob);
   const [expanded, setExpanded] = useState(false);
   return (
     <div>
@@ -2079,7 +2099,7 @@ export const ImportBlock = memo(function ImportBlock({
   onDiscard: () => void;
 }) {
   const C = useC();
-  const T = makeT(C);
+  const mob = useContext(MobileCtx); const T = makeT(C, mob);
   const [selected, setSelected] = useState(
     () => new Set(quotes.map((_, i) => i))
   );
@@ -2248,7 +2268,7 @@ export const ReadingSessionBlock = memo(function ReadingSessionBlock({
   onMark?: (cardId: string, note: string) => void;
 }) {
   const C = useC();
-  const T = makeT(C);
+  const mob = useContext(MobileCtx); const T = makeT(C, mob);
   const [idx, setIdx] = useState(0);
   const [reflected, setReflected] = useState(false);
   const [done, setDone] = useState(false);
@@ -2502,6 +2522,7 @@ export const Palette = memo(function Palette({
   renderItem: (item: unknown) => React.ReactNode;
 }) {
   const C = useC();
+  const mob = useContext(MobileCtx);
   const activeRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     activeRef.current?.scrollIntoView({ block: "nearest" });
@@ -2532,7 +2553,7 @@ export const Palette = memo(function Palette({
         }}
       >
         {icon}
-        <span style={makeT(C).label}>
+        <span style={makeT(C, mob).label}>
           {loading ? "Searching…" : title}
         </span>
       </div>
@@ -2598,7 +2619,7 @@ export function BookPalette({
   loading: boolean;
 }) {
   const C = useC();
-  const T = makeT(C);
+  const mob = useContext(MobileCtx); const T = makeT(C, mob);
   return (
     <Palette
       title="Books"
@@ -2651,7 +2672,7 @@ export function CommandPalette({
   onSelect: (cmd: string) => void;
 }) {
   const C = useC();
-  const T = makeT(C);
+  const mob = useContext(MobileCtx); const T = makeT(C, mob);
   const filtered = useMemo(
     () =>
       COMMANDS.filter(
@@ -2768,7 +2789,7 @@ export const FilterBar = memo(function FilterBar({
   onClearAll: () => void;
 }) {
   const C = useC();
-  const T = makeT(C);
+  const mob = useContext(MobileCtx); const T = makeT(C, mob);
   const [step, setStep] = useState<{ type: string; label: string } | "type" | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -3269,7 +3290,7 @@ export const ShareCardModal = memo(function ShareCardModal({
   onClose: () => void;
 }) {
   const C = useC();
-  const T = makeT(C);
+  const mob = useContext(MobileCtx); const T = makeT(C, mob);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState<"image" | "text" | null>(null);
@@ -3343,7 +3364,7 @@ export const ShareCardModal = memo(function ShareCardModal({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: 32,
+        padding: mob ? 16 : 32,
         fontFamily: FONT_SANS,
         background: C.base,
         opacity: visible ? 1 : 0,
@@ -3543,7 +3564,7 @@ export const RandomCard = memo(function RandomCard({
   onUpdate?: (id: string, patch: Partial<CardLike>) => void;
 }) {
   const C = useC();
-  const T = makeT(C);
+  const mob = useContext(MobileCtx); const T = makeT(C, mob);
   const [visible, setVisible] = useState(false);
   const [showReflect, setShowReflect] = useState(false);
   const [showShare, setShowShare] = useState(false);
@@ -3581,7 +3602,7 @@ export const RandomCard = memo(function RandomCard({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: 48,
+        padding: mob ? 20 : 48,
         fontFamily: FONT_SANS,
         background: C.base,
       }}
@@ -3793,7 +3814,7 @@ export const MorningCard = memo(function MorningCard({
   onUpdate: (id: string, patch: Partial<CardLike>) => void;
 }) {
   const C = useC();
-  const T = makeT(C);
+  const mob = useContext(MobileCtx); const T = makeT(C, mob);
   const [visible, setVisible] = useState(false);
   const [showReflectM, setShowReflectM] = useState(false);
   const [showShareM, setShowShareM] = useState(false);
@@ -3839,7 +3860,7 @@ export const MorningCard = memo(function MorningCard({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: "48px 0 32px",
+        padding: mob ? "32px 0 24px" : "48px 0 32px",
         fontFamily: FONT_SANS,
         opacity: visible ? 1 : 0,
         transition: "opacity 0.6s ease",
@@ -3858,7 +3879,7 @@ export const MorningCard = memo(function MorningCard({
         }}
       >
         {/* Thin rule */}
-        <div style={{ width: 32, height: 1, background: C.border, marginBottom: 48 }} />
+        <div style={{ width: 32, height: 1, background: C.border, marginBottom: mob ? 28 : 48 }} />
 
         {/* Quote */}
         <p
@@ -4088,7 +4109,7 @@ export const LibraryPanel = memo(function LibraryPanel({
   allCards?: CardLike[];
 }) {
   const C = useC();
-  const T = makeT(C);
+  const mob = useContext(MobileCtx); const T = makeT(C, mob);
   const [filters, setFilters] = useState<Filter[]>([]);
   const [search, setSearch] = useState("");
   const [smartMode, setSmartMode] = useState(false);
@@ -4244,7 +4265,7 @@ export const LibraryPanel = memo(function LibraryPanel({
                     background: "none",
                     border: "none",
                     cursor: "pointer",
-                    padding: 6,
+                    padding: mob ? 12 : 6,
                     color: C.faint,
                     display: "flex",
                     alignItems: "center",
@@ -4327,7 +4348,8 @@ export const LibraryPanel = memo(function LibraryPanel({
             padding: "10px 0",
             display: "flex",
             alignItems: "center",
-            gap: 10,
+            gap: mob ? 8 : 10,
+            flexWrap: mob ? "wrap" : "nowrap",
           }}
         >
           <div style={{ display: "flex", borderRadius: R.md, border: `1px solid ${C.border}`, overflow: "hidden", flexShrink: 0 }}>
@@ -4336,8 +4358,8 @@ export const LibraryPanel = memo(function LibraryPanel({
                 key={mode}
                 onClick={() => setViewMode(mode)}
                 style={{
-                  padding: "5px 10px",
-                  fontSize: 11,
+                  padding: mob ? "10px 14px" : "5px 10px",
+                  fontSize: mob ? 13 : 11,
                   fontFamily: FONT_SANS,
                   fontWeight: viewMode === mode ? 500 : 400,
                   background: viewMode === mode ? C.ink : "transparent",
@@ -4351,7 +4373,7 @@ export const LibraryPanel = memo(function LibraryPanel({
               </button>
             ))}
           </div>
-          <div style={{ position: "relative", flex: 1 }}>
+          <div style={{ position: "relative", flex: 1, ...(mob && { order: 3, flex: "1 1 100%" }) }}>
             <Search
               size={12}
               style={{
@@ -4410,10 +4432,10 @@ export const LibraryPanel = memo(function LibraryPanel({
                 background: smartMode ? C.surfaceAlt : "transparent",
                 border: `1px solid ${smartMode ? C.ink : C.border}`,
                 borderRadius: R.md,
-                padding: "5px 10px",
+                padding: mob ? "10px 14px" : "5px 10px",
                 cursor: "pointer",
                 fontFamily: FONT_SANS,
-                fontSize: 11,
+                fontSize: mob ? 13 : 11,
                 color: smartMode ? C.ink : C.muted,
                 flexShrink: 0,
                 fontWeight: smartMode ? 600 : 400,
@@ -4532,7 +4554,7 @@ export const ExportPanel = memo(function ExportPanel({
   onClose: () => void;
 }) {
   const C = useC();
-  const T = makeT(C);
+  const mob = useContext(MobileCtx); const T = makeT(C, mob);
   const [copied, setCopied] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
@@ -4588,7 +4610,7 @@ export const ExportPanel = memo(function ExportPanel({
           background: C.base,
           border: `1px solid ${C.border}`,
           borderRadius: R.xl,
-          padding: "32px 36px",
+          padding: mob ? "24px 20px" : "32px 36px",
           maxWidth: 400,
           width: "100%",
           boxShadow: "0 16px 60px rgba(0,0,0,0.12)",
@@ -4688,7 +4710,7 @@ export const EmptyState = memo(function EmptyState({
   onDemo: () => void;
 }) {
   const C = useC();
-  const T = makeT(C);
+  const mob = useContext(MobileCtx); const T = makeT(C, mob);
   return (
     <div
       style={{
@@ -4799,7 +4821,7 @@ export const MsgBubble = function MsgBubble({
   inputContainerRef?: React.RefObject<HTMLDivElement | null>;
 }) {
   const C = useC();
-  const T = makeT(C);
+  const mob = useContext(MobileCtx); const T = makeT(C, mob);
   if (m.role === "user")
     return (
       <div style={{ display: "flex", justifyContent: "flex-end" }}>

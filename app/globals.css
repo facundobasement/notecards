@@ -50,3 +50,13 @@ textarea, input { font-family: inherit; }
 ::-webkit-scrollbar { width: 3px; height: 3px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { border-radius: 3px; }
+
+/* Mobile: always show card action buttons (no hover on touch) */
+@media (max-width: 640px) {
+  .nc-card .nc-action-btn { opacity: 1 !important; }
+}
+
+/* Prevent iOS zoom on input focus */
+@media (max-width: 640px) {
+  input, textarea, select { font-size: 16px !important; }
+}

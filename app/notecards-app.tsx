@@ -18,6 +18,8 @@ import {
   FONT_SANS,
   FONT_SERIF,
   makeT,
+  useIsMobile,
+  MobileCtx,
   getPlaceholder,
   cleanTag,
   cardToCtx,
@@ -523,6 +525,7 @@ type NotecardsAppProps = {
 };
 
 export default function NotecardsApp({ userId }: NotecardsAppProps) {
+  const isMobile = useIsMobile();
   const [cards, dispatch] = useReducer(cardsReducer, []);
   const [dark, setDark] = useState(false);
   const [storageLoaded, setStorageLoaded] = useState(false);
@@ -1189,6 +1192,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
 
   return (
     <ThemeCtx.Provider value={C}>
+    <MobileCtx.Provider value={isMobile}>
       <div style={{ fontFamily: FONT_SANS, background: C.base, minHeight: "100vh" }}>
         <style>{`
           @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=DM+Sans:wght@300;400;500&display=swap');
@@ -1258,7 +1262,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
             maxWidth: 640,
             width: "100%",
             margin: "0 auto",
-            padding: "0 28px",
+            padding: isMobile ? "0 16px" : "0 28px",
             display: "flex",
             flexDirection: "column",
             minHeight: "100vh",
@@ -1290,8 +1294,8 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
                     display: "flex",
                     alignItems: "center",
                     gap: 6,
-                    padding: "10px 16px",
-                    fontSize: 12,
+                    padding: isMobile ? "14px 20px" : "10px 16px",
+                    fontSize: isMobile ? 14 : 12,
                     fontWeight: activeTab === tab.key ? 500 : 400,
                     fontFamily: FONT_SANS,
                     color: activeTab === tab.key ? C.ink : C.faint,
@@ -1466,7 +1470,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
                 {flowStage === "book" && !selectedBook && (
                   <span
                     style={{
-                      ...makeT(C).label,
+                      ...makeT(C, isMobile).label,
                       flexShrink: 0,
                       paddingBottom: 4,
                       alignSelf: "center",
@@ -1478,7 +1482,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
                 {flowStage === "author" && (
                   <span
                     style={{
-                      ...makeT(C).label,
+                      ...makeT(C, isMobile).label,
                       flexShrink: 0,
                       paddingBottom: 4,
                       alignSelf: "center",
@@ -1490,7 +1494,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
                 {flowStage === "import" && (
                   <span
                     style={{
-                      ...makeT(C).label,
+                      ...makeT(C, isMobile).label,
                       flexShrink: 0,
                       paddingBottom: 4,
                       alignSelf: "center",
@@ -1503,9 +1507,9 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
                 {selectedBook ? (
                   <>
                     <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
-                      <span style={makeT(C).book}>{selectedBook.title}</span>
+                      <span style={makeT(C, isMobile).book}>{selectedBook.title}</span>
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <span style={{ ...makeT(C).author, fontSize: 12 }}>by</span>
+                        <span style={{ ...makeT(C, isMobile).author, fontSize: 12 }}>by</span>
                         <input
                           autoFocus
                           value={authorDraft}
@@ -1630,8 +1634,8 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
                       onClick={handleSend}
                       disabled={flowStage !== "author" && flowStage !== "location" && (!input.trim() || loading)}
                       style={{
-                        width: 32,
-                        height: 32,
+                        width: isMobile ? 44 : 32,
+                        height: isMobile ? 44 : 32,
                         borderRadius: "50%",
                         border: "none",
                         flexShrink: 0,
@@ -1658,7 +1662,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
                           }}
                         />
                       ) : (
-                        <ArrowUp size={14} />
+                        <ArrowUp size={isMobile ? 18 : 14} />
                       )}
                     </button>
                   </>
@@ -1707,6 +1711,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
           </div>
         )}
       </div>
+    </MobileCtx.Provider>
     </ThemeCtx.Provider>
   );
 }
