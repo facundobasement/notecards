@@ -742,7 +742,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
 
   const handleInputChange = useCallback((val: string) => {
     setInput(val);
-    if (val.startsWith("/")) {
+    if (val === "" || val.startsWith("/")) {
       setShowCmdPalette(true);
       setCmdQuery(val);
     } else setShowCmdPalette(false);
@@ -1584,6 +1584,12 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
                           ? handleBookInput(e.target.value)
                           : handleInputChange(e.target.value)
                       }
+                      onFocus={() => {
+                        if (!input && flowStage !== "book") {
+                          setShowCmdPalette(true);
+                          setCmdQuery("");
+                        }
+                      }}
                       onKeyDown={(e) => {
                         if (e.key === "Escape") {
                           setShowCmdPalette(false);
