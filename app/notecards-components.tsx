@@ -3,6 +3,7 @@
 import {
   useState,
   useEffect,
+  useLayoutEffect,
   useRef,
   useMemo,
   memo,
@@ -1095,16 +1096,19 @@ const CardDetailDrawer = memo(function CardDetailDrawer({
   const quoteRef = useRef<HTMLTextAreaElement>(null);
   const tagInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (inputContainerRef?.current) {
       const rect = inputContainerRef.current.getBoundingClientRect();
       if (rect.width > 0) {
         setDrawerStyle({ left: rect.left, width: rect.width });
       }
     }
+  }, [inputContainerRef]);
+
+  useEffect(() => {
     const t = requestAnimationFrame(() => setVisible(true));
     return () => cancelAnimationFrame(t);
-  }, [inputContainerRef]);
+  }, []);
 
   useEffect(() => {
     const t = setTimeout(() => quoteRef.current?.focus(), 120);
