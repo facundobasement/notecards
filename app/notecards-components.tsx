@@ -1111,6 +1111,53 @@ const CardDetailDrawer = memo(function CardDetailDrawer({
   // Sections
   const [expandedSection, setExpandedSection] = useState<string>("quote");
 
+  // Book/author suggestions from library
+  const [bookSuggs, setBookSuggs] = useState<{ title: string; author: string; year: number | null }[]>([]);
+  const [authorSuggs, setAuthorSuggs] = useState<string[]>([]);
+  const [showBookSuggs, setShowBookSuggs] = useState(false);
+  const [showAuthorSuggs, setShowAuthorSuggs] = useState(false);
+
+  const personalBooks = useMemo(() => {
+    const seen = new Map<string, { title: string; author: string; year: number | null }>();
+    [...(allCards ?? [])].reverse().forEach((c) => {
+      const k = c.book.toLowerCase();
+      if (!seen.has(k)) seen.set(k, { title: c.book, author: c.author || "", year: c.year ?? null });
+    });
+    return [...seen.values()];
+  }, [allCards]);
+
+  const uniqueAuthors = useMemo(() => {
+    const seen = new Set<string>();
+    (allCards ?? []).forEach((c) => { if (c.author) seen.add(c.author); });
+    return [...seen];
+  }, [allCards]);
+
+  const handleBookChange = (val: string) => {
+    setBook(val);
+    if (val.length >= 1) {
+      const ql = val.toLowerCase();
+      const matches = personalBooks.filter(b =>
+        b.title.toLowerCase().includes(ql) || b.author.toLowerCase().includes(ql)
+      ).slice(0, 6);
+      setBookSuggs(matches);
+      setShowBookSuggs(matches.length > 0);
+    } else {
+      setShowBookSuggs(false);
+    }
+  };
+
+  const handleAuthorChange = (val: string) => {
+    setAuthor(val);
+    if (val.length >= 1) {
+      const ql = val.toLowerCase();
+      const matches = uniqueAuthors.filter(a => a.toLowerCase().includes(ql)).slice(0, 6);
+      setAuthorSuggs(matches);
+      setShowAuthorSuggs(matches.length > 0);
+    } else {
+      setShowAuthorSuggs(false);
+    }
+  };
+
   const quoteRef = useRef<HTMLTextAreaElement>(null);
   const tagInputRef = useRef<HTMLInputElement>(null);
 
@@ -1302,11 +1349,13 @@ const CardDetailDrawer = memo(function CardDetailDrawer({
                 }}
               />
               <div style={{ display: "flex", gap: 12 }}>
-                <div style={{ flex: 1 }}>
+                <div style={{ flex: 1, position: "relative" }}>
                   <p style={{ ...T.label, marginBottom: 6 }}>Book</p>
                   <input
                     value={book}
-                    onChange={(e) => setBook(e.target.value)}
+                    onChange={(e) => handleBookChange(e.target.value)}
+                    onFocus={() => { if (book.length >= 1) handleBookChange(book); }}
+                    onBlur={() => setTimeout(() => setShowBookSuggs(false), 150)}
                     placeholder="Book title"
                     style={{
                       width: "100%",
@@ -1323,12 +1372,61 @@ const CardDetailDrawer = memo(function CardDetailDrawer({
                       background: "transparent",
                     }}
                   />
+                  {showBookSuggs && bookSuggs.length > 0 && (
+                    <div style={{
+                      position: "absolute",
+                      top: "100%",
+                      left: 0,
+                      right: 0,
+                      zIndex: 60,
+                      background: C.base,
+                      border: `1px solid ${C.border}`,
+                      borderRadius: R.md,
+                      boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
+                      maxHeight: 180,
+                      overflowY: "auto",
+                      marginTop: 4,
+                    }}>
+                      {bookSuggs.map((b) => (
+                        <button
+                          key={b.title}
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            setBook(b.title);
+                            setAuthor(b.author);
+                            setShowBookSuggs(false);
+                          }}
+                          style={{
+                            width: "100%",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            padding: "8px 12px",
+                            background: "none",
+                            border: "none",
+                            borderBottom: `1px solid ${C.border}`,
+                            cursor: "pointer",
+                            fontFamily: FONT_SANS,
+                            textAlign: "left",
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = C.surface; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
+                        >
+                          <span style={{ fontSize: 12, color: C.ink }}>{b.title}</span>
+                          <span style={{ fontSize: 11, color: C.faint, marginLeft: 8, flexShrink: 0 }}>{b.author}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div style={{ flex: 1 }}>
+                <div style={{ flex: 1, position: "relative" }}>
                   <p style={{ ...T.label, marginBottom: 6 }}>Author</p>
                   <input
                     value={author}
-                    onChange={(e) => setAuthor(e.target.value)}
+                    onChange={(e) => handleAuthorChange(e.target.value)}
+                    onFocus={() => { if (author.length >= 1) handleAuthorChange(author); }}
+                    onBlur={() => setTimeout(() => setShowAuthorSuggs(false), 150)}
                     placeholder="Author"
                     style={{
                       width: "100%",
@@ -1342,6 +1440,50 @@ const CardDetailDrawer = memo(function CardDetailDrawer({
                       background: "transparent",
                     }}
                   />
+                  {showAuthorSuggs && authorSuggs.length > 0 && (
+                    <div style={{
+                      position: "absolute",
+                      top: "100%",
+                      left: 0,
+                      right: 0,
+                      zIndex: 60,
+                      background: C.base,
+                      border: `1px solid ${C.border}`,
+                      borderRadius: R.md,
+                      boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
+                      maxHeight: 180,
+                      overflowY: "auto",
+                      marginTop: 4,
+                    }}>
+                      {authorSuggs.map((a) => (
+                        <button
+                          key={a}
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            setAuthor(a);
+                            setShowAuthorSuggs(false);
+                          }}
+                          style={{
+                            width: "100%",
+                            padding: "8px 12px",
+                            background: "none",
+                            border: "none",
+                            borderBottom: `1px solid ${C.border}`,
+                            cursor: "pointer",
+                            fontFamily: FONT_SANS,
+                            fontSize: 12,
+                            color: C.ink,
+                            textAlign: "left",
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = C.surface; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
+                        >
+                          {a}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
               <div>
