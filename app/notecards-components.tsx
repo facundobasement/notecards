@@ -1217,7 +1217,7 @@ const CardDetailDrawer = memo(function CardDetailDrawer({
             ? (visible ? "translateY(0)" : "translateY(100%)")
             : drawerStyle.width != null
               ? (visible ? "translateY(0)" : "translateY(100%)")
-              : (visible ? "translateX(-50%)" : "translateX(-50%) translateY(100%)"),
+              : (visible ? "translateX(-50%) translateY(0)" : "translateX(-50%) translateY(100%)"),
           transition: "transform 0.28s cubic-bezier(0.32,0.72,0,1)",
         }}
       >
