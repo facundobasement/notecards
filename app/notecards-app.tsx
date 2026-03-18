@@ -787,9 +787,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
       setAuthorDraft("");
       manualBookRef.current = "";
       setAddCtx((c: any) => ({ ...c, book: title, author, year: year ?? null }));
-      setMessages((p) => [...p, mkMsg("assistant", { type: "text", text: "Page, chapter, or location? *(optional — press Enter to skip)*" })]);
-      setFlowStage("location");
-      setTimeout(() => inputRef.current?.focus(), 50);
+      continueToTags({ title, author, year: year ?? null });
     },
     []
   );
@@ -870,7 +868,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
         year: ctx.year,
         tags,
         note: "",
-        location: ctx.location ?? "",
+        location: "",
         starred: false,
         createdAt: NOW(),
         lastSeenAt: NOW(),
@@ -955,15 +953,6 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
 
   const handleSend = useCallback(async () => {
     const raw = input.trim();
-    if (flowStage === "location") {
-      const loc = raw.trim();
-      if (loc) setMessages((p) => [...p, mkMsg("user", { type: "text", text: loc })]);
-      setAddCtx((c: any) => ({ ...c, location: loc }));
-      setInput("");
-      const ctx = addCtxRef.current;
-      if (ctx) continueToTags({ title: ctx.book, author: ctx.author ?? "", year: ctx.year ?? null });
-      return;
-    }
     if (!raw || loading) return;
 
     if (flowStage === "book") {
@@ -1649,7 +1638,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
                     />
                     <button
                       onClick={handleSend}
-                      disabled={flowStage !== "author" && flowStage !== "location" && (!input.trim() || loading)}
+                      disabled={flowStage !== "author" && (!input.trim() || loading)}
                       style={{
                         width: isMobile ? 44 : 32,
                         height: isMobile ? 44 : 32,
