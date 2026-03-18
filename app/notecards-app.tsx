@@ -451,6 +451,32 @@ async function smartWrite(topic: string, cards: any[], signal: AbortSignal) {
   };
 }
 
+async function detectBookFromQuote(
+  quote: string,
+  personalBooks: { title: string; author: string; year: number | null }[],
+  signal: AbortSignal,
+): Promise<{ book: string; author: string; year: number | null } | null> {
+  const lib = personalBooks.map(b => `${b.title} — ${b.author}`).join("\n");
+  const raw = await callClaude(
+    [{
+      role: "user",
+      content: `Identify the book this quote is from.\n\nQuote: "${quote.slice(0, 500)}"\n\nUser's library:\n${lib || "(empty)"}\n\nJSON: {"book":"<title>","author":"<author>","year":<year or null>,"confidence":"high"|"low"}`,
+    }],
+    "Return ONLY JSON, no markdown.",
+    signal,
+    false,
+    300,
+  );
+  const p = await parseJSON(raw);
+  if (!p?.book) return null;
+  const match = personalBooks.find(
+    b => b.title.toLowerCase() === p.book.toLowerCase()
+  );
+  if (match) return { book: match.title, author: match.author, year: match.year };
+  if (p.confidence === "low") return null;
+  return { book: p.book, author: p.author || "", year: p.year ?? null };
+}
+
 async function parseImportChunk(text: string, signal: AbortSignal) {
   const prompt = `Parse the following text and extract book quotes.\n\nText:\n${text}\n\nJSON: {"quotes":[{"quote":"<exact quote text>","book":"<book title>","author":"<author name or empty>","year":<year number or null>,"tags":["<tag1>","<tag2>"]}]}\n\nRules:\n- Extract as many distinct quotes as possible\n- Generate 2-4 relevant lowercase tags per quote\n- Return empty array if no quotes found`;
   const raw = await callClaude(
@@ -555,6 +581,13 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
   const [showCmdPalette, setShowCmdPalette] = useState(false);
   const [cmdQuery, setCmdQuery] = useState("");
   const [pastePrompt, setPastePrompt] = useState<string | null>(null);
+  const [quickCapture, setQuickCapture] = useState<{
+    quote: string;
+    book: string;
+    author: string;
+    year: number | null;
+    detecting: boolean;
+  } | null>(null);
   const [randomCard, setRandomCard] = useState<any>(null);
   const [showMorningCard, setShowMorningCard] = useState(false);
   const [showWelcome, setShowWelcome] = useState(() => typeof window !== "undefined" && !localStorage.getItem("nc_onboarding_dismissed_v1"));
@@ -628,6 +661,7 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
   const lastShownIds = useRef<string[]>([]);
   const abortRef = useRef<AbortController | null>(null);
   const bookAbortRef = useRef<AbortController | null>(null);
+  const quickCaptureAbortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const inputContainerRef = useRef<HTMLDivElement | null>(null);
@@ -805,9 +839,44 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
       setShowCmdPalette(true);
       setCmdQuery(val);
     } else setShowCmdPalette(false);
-    if (val.length > 60 && !val.startsWith("/")) setPastePrompt(val);
-    else setPastePrompt(null);
-  }, []);
+    if (val.length > 60 && !val.startsWith("/")) {
+      setPastePrompt(val);
+      // Quick capture: detect book/author via AI
+      setQuickCapture({ quote: val, book: "", author: "", year: null, detecting: true });
+      quickCaptureAbortRef.current?.abort();
+      const ctrl = new AbortController();
+      quickCaptureAbortRef.current = ctrl;
+      detectBookFromQuote(val, buildPersonalBooks(cardsRef.current), ctrl.signal)
+        .then(result => {
+          if (ctrl.signal.aborted) return;
+          const fb = cardsRef.current[0];
+          setQuickCapture({
+            quote: val,
+            book: result?.book || fb?.book || "",
+            author: result?.author || fb?.author || "",
+            year: result?.year ?? fb?.year ?? null,
+            detecting: false,
+          });
+        })
+        .catch(() => {
+          if (ctrl.signal.aborted) return;
+          const fb = cardsRef.current[0];
+          setQuickCapture({
+            quote: val,
+            book: fb?.book || "",
+            author: fb?.author || "",
+            year: fb?.year ?? null,
+            detecting: false,
+          });
+        });
+    } else {
+      setPastePrompt(null);
+      if (quickCapture) {
+        setQuickCapture(null);
+        quickCaptureAbortRef.current?.abort();
+      }
+    }
+  }, [quickCapture]);
 
   const personalBooks = useMemo(() => buildPersonalBooks(cards), [cards]);
   const bookSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -960,6 +1029,71 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
     },
     [userId]
   );
+
+  const handleQuickSave = useCallback(async () => {
+    if (!quickCapture || quickCapture.detecting) return;
+    const { quote, book, author, year } = quickCapture;
+    setQuickCapture(null);
+    setPastePrompt(null);
+    setInput("");
+
+    const card = {
+      id: uid(),
+      quote,
+      book,
+      author,
+      year,
+      tags: [] as string[],
+      note: "",
+      location: "",
+      starred: false,
+      createdAt: NOW(),
+      lastSeenAt: NOW(),
+    };
+
+    dispatch({ type: "ADD", card });
+    setSavedCardId(card.id);
+    setTimeout(() => setSavedCardId(null), 800);
+    setMessages(p => [...p, mkMsg("assistant", { type: "saved", card, liveCard: card })]);
+
+    const { error } = await supabase.from("notecards").insert(cardToRow(card, userId));
+    if (error) console.error("Quick capture insert error:", error);
+
+    // Check milestones
+    const newTotal = cardsRef.current.length;
+    const newBooks = new Set(cardsRef.current.map(c => c.book)).size;
+    const QUOTE_M = [10, 25, 50, 100, 250, 500];
+    const BOOK_M = [5, 10, 25];
+    const isQM = QUOTE_M.includes(newTotal);
+    const isBM = BOOK_M.includes(newBooks);
+    if (isQM || isBM) {
+      const key = `nc_milestone_${isQM ? `q${newTotal}` : `b${newBooks}`}`;
+      if (!localStorage.getItem(key)) {
+        localStorage.setItem(key, "1");
+        setMilestone({ quotes: newTotal, books: newBooks });
+      }
+    }
+
+    // Silent tag generation in background
+    try {
+      const existingTags = [...new Set(cardsRef.current.flatMap(c => c.tags ?? []))];
+      const raw = await callClaude(
+        [{ role: "user", content: `Quote:"${quote}"\nBook:${book}\nAuthor:${author}\nYear:${year ?? "?"}\nSubjects:none\nExisting tags:${existingTags.join(",") || "none"}` }],
+        'Return ONLY JSON: {"tags":["<3-5 lowercase thematic tags>"]}',
+        new AbortController().signal,
+        false,
+        300,
+      );
+      const p = await parseJSON(raw);
+      const tags = (p.tags ?? []).map((t: string) => cleanTag(t)).filter(Boolean);
+      if (tags.length) {
+        dispatch({ type: "UPDATE", id: card.id, patch: { tags } });
+        await supabase.from("notecards").update({ tags }).eq("id", card.id);
+      }
+    } catch {
+      // Tags remain empty — user can add later
+    }
+  }, [quickCapture, userId]);
 
   const handleTagDiscard = useCallback((pid: string) => {
     setMessages((p) => p.map((m) => (m.id === pid ? { ...m, type: "text", text: "Discarded." } : m)));
@@ -1493,48 +1627,76 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
               background: `linear-gradient(to bottom, transparent, ${C.base})`,
             }}
           >
-            {pastePrompt && !flowStage && (
+            {quickCapture && !flowStage && (
               <div
                 style={{
                   animation: "fadeIn 0.15s ease",
                   marginBottom: 10,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  padding: "10px 16px",
+                  padding: "12px 16px",
                   borderRadius: R.lg,
                   border: `1px solid ${C.border}`,
-                  background: C.base,
+                  background: C.surface,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
                 }}
               >
-                <span
-                  style={{
-                    fontSize: 14,
-                    flex: 1,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    color: C.muted,
-                    fontFamily: FONT_SERIF,
-                  }}
-                >
-                  "{pastePrompt.slice(0, 72)}…"
-                </span>
-                <Btn variant="primary" size="xs" onClick={() => startAdd(pastePrompt)}>
-                  Save as quote
-                </Btn>
-                <button
-                  onClick={() => setPastePrompt(null)}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    color: C.faint,
-                    display: "inline-flex",
-                  }}
-                >
-                  <X size={13} />
-                </button>
+                <p style={{
+                  fontSize: 14,
+                  color: C.muted,
+                  fontFamily: FONT_SERIF,
+                  fontStyle: "italic",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  margin: 0,
+                }}>
+                  &ldquo;{quickCapture.quote.slice(0, 80)}…&rdquo;
+                </p>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  {quickCapture.detecting ? (
+                    <span style={{ fontSize: 12, color: C.faint, fontFamily: FONT_SANS }}>
+                      Detecting book…
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: 13, color: C.ink, fontFamily: FONT_SANS, flex: 1 }}>
+                      {quickCapture.book || "Unknown book"}
+                      {quickCapture.author && (
+                        <span style={{ color: C.muted }}> — {quickCapture.author}</span>
+                      )}
+                    </span>
+                  )}
+                  <div style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
+                    {!quickCapture.detecting && quickCapture.book && (
+                      <Btn variant="primary" size="xs" onClick={handleQuickSave}>
+                        Save
+                      </Btn>
+                    )}
+                    <Btn variant="outline" size="xs" onClick={() => {
+                      startAdd(quickCapture.quote);
+                      setQuickCapture(null);
+                    }}>
+                      Edit
+                    </Btn>
+                    <button
+                      onClick={() => {
+                        setQuickCapture(null);
+                        setPastePrompt(null);
+                        setInput("");
+                        quickCaptureAbortRef.current?.abort();
+                      }}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        color: C.faint,
+                        display: "inline-flex",
+                      }}
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 
