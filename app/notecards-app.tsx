@@ -29,13 +29,14 @@ import {
   RandomCard,
   ExportPanel,
   LibraryPanel,
-  EmptyState,
+  WelcomeLetter,
+  SeedCard,
+  ContextualHint,
   MsgBubble,
   Thinking,
   CommandPalette,
   BookPalette,
   MorningCard,
-  WelcomeCard,
   CurrentlyReading,
   ReflectionNudge,
   MilestoneCard,
@@ -278,79 +279,6 @@ function mergeBookSuggestions(
   return [...pm, ...ef].slice(0, 8);
 }
 
-// ─── Demo cards ───────────────────────────────────────────────────────────────
-const DEMO_CARDS = [
-  {
-    id: "d1",
-    quote:
-      "The impediment to action advances action. What stands in the way becomes the way.",
-    book: "Meditations",
-    author: "Marcus Aurelius",
-    year: 180,
-    tags: ["stoicism", "obstacles", "mindset"],
-    note: "",
-    location: "Book 5, Section 20",
-    starred: false,
-    createdAt: NOW() - 864e5 * 10,
-    lastSeenAt: undefined,
-  },
-  {
-    id: "d2",
-    quote:
-      "We are what we repeatedly do. Excellence, then, is not an act, but a habit.",
-    book: "Nicomachean Ethics",
-    author: "Aristotle",
-    year: -350,
-    tags: ["habits", "excellence", "character"],
-    note: "Counter to the Stoic emphasis on momentary choice?",
-    location: "",
-    starred: false,
-    createdAt: NOW() - 864e5 * 8,
-    lastSeenAt: undefined,
-  },
-  {
-    id: "d3",
-    quote:
-      "A reader lives a thousand lives before he dies. The man who never reads lives only one.",
-    book: "A Dance with Dragons",
-    author: "George R.R. Martin",
-    year: 2011,
-    tags: ["reading", "life", "imagination"],
-    note: "",
-    location: "",
-    starred: false,
-    createdAt: NOW() - 864e5 * 5,
-    lastSeenAt: undefined,
-  },
-  {
-    id: "d4",
-    quote: "The first draft of anything is shit.",
-    book: "On Writing",
-    author: "Stephen King",
-    year: 2000,
-    tags: ["writing", "drafts", "craft"],
-    note: "Permission slip for every writer.",
-    location: "p. 37",
-    starred: false,
-    createdAt: NOW() - 864e5 * 3,
-    lastSeenAt: undefined,
-  },
-  {
-    id: "d5",
-    quote:
-      "You do not rise to the level of your goals. You fall to the level of your systems.",
-    book: "Atomic Habits",
-    author: "James Clear",
-    year: 2018,
-    tags: ["habits", "systems", "goals"],
-    note: "",
-    location: "Ch. 1",
-    starred: false,
-    createdAt: NOW() - 864e5,
-    lastSeenAt: undefined,
-  },
-];
-
 // ─── AI functions ─────────────────────────────────────────────────────────────
 
 async function intelligentFind(
@@ -590,7 +518,7 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
   } | null>(null);
   const [randomCard, setRandomCard] = useState<any>(null);
   const [showMorningCard, setShowMorningCard] = useState(false);
-  const [showWelcome, setShowWelcome] = useState(() => typeof window !== "undefined" && !localStorage.getItem("nc_onboarding_dismissed_v1"));
+  const [activeHint, setActiveHint] = useState<string | null>(null);
   const [savedCardId, setSavedCardId] = useState<string | null>(null);
   const [tagDrawer, setTagDrawer] = useState<any>(null);
   const [undoToast, setUndoToast] = useState<{ card: any; timer: ReturnType<typeof setTimeout> } | null>(null);
@@ -640,10 +568,16 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
     return { ...best, dismissKey: key };
   }, [cards, nudgeDismissed]);
 
-  const dismissWelcome = () => {
-    localStorage.setItem("nc_onboarding_dismissed_v1", "1");
-    setShowWelcome(false);
-  };
+  const showHint = useCallback((key: string) => {
+    if (typeof window === "undefined") return;
+    if (localStorage.getItem(key)) return;
+    setActiveHint((prev) => prev ?? key);
+  }, []);
+
+  const dismissHint = useCallback((key: string) => {
+    if (typeof window !== "undefined") localStorage.setItem(key, "1");
+    setActiveHint((prev) => (prev === key ? null : prev));
+  }, []);
 
   const dismissNudge = useCallback(() => {
     if (reflectionNudge) {
@@ -712,7 +646,13 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
     if (cardsLoading || cards.length === 0 || messages.length > 0 || welcomeDigestTriggeredRef.current) return;
     welcomeDigestTriggeredRef.current = true;
     setShowMorningCard(true);
-  }, [cardsLoading, cards.length, messages.length]);
+    showHint("nc_hint_morning");
+  }, [cardsLoading, cards.length, messages.length, showHint]);
+
+  // Show library hint on first visit to library tab
+  useEffect(() => {
+    if (activeTab === "library" && cards.length > 0) showHint("nc_hint_library");
+  }, [activeTab, cards.length, showHint]);
 
   // Persist dark mode to localStorage when storageLoaded
   useEffect(() => {
@@ -1006,6 +946,7 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
       if (error) console.error("Supabase insert error:", error);
       setSavedCardId(card.id);
       setTimeout(() => setSavedCardId(null), 800);
+      showHint("nc_hint_edit");
       lastShownIds.current = [card.id];
       // Check milestones
       const newTotal = cardsRef.current.length + 1;
@@ -1054,6 +995,7 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
     dispatch({ type: "ADD", card });
     setSavedCardId(card.id);
     setTimeout(() => setSavedCardId(null), 800);
+    showHint("nc_hint_edit");
     setMessages(p => [...p, mkMsg("assistant", { type: "saved", card, liveCard: card })]);
 
     const { error } = await supabase.from("notecards").insert(cardToRow(card, userId));
@@ -1147,14 +1089,6 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
     setFlowStage("book");
     setTimeout(() => inputRef.current?.focus(), 50);
   }, []);
-
-  const runDemo = useCallback(async () => {
-    for (const card of DEMO_CARDS) {
-      dispatch({ type: "ADD", card });
-      const { error } = await supabase.from("notecards").insert(cardToRow(card, userId));
-      if (error) console.error("Supabase insert error:", error);
-    }
-  }, [userId]);
 
   const libraryCtx = useMemo(() => cards.map((c) => cardToCtx(c)).join("\n\n"), [cards]);
 
@@ -1541,14 +1475,23 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
               onUpdateName={handleUpdateName}
             />
           ) : activeTab === "library" && !showEmpty && !cardsLoading ? (
-            <LibraryPanel
-              cards={cards}
-              {...msgCardProps}
-              onClose={() => setActiveTab("home")}
-              onRandom={openRandom}
-              onExport={() => setShowExport(true)}
-              onSmartSearch={(query, signal) => intelligentFind(query, cards, undefined, signal)}
-            />
+            <>
+              {activeHint === "nc_hint_library" && (
+                <ContextualHint
+                  text="Your cards, organized by book, tag, or time."
+                  storageKey="nc_hint_library"
+                  onDismiss={() => dismissHint("nc_hint_library")}
+                />
+              )}
+              <LibraryPanel
+                cards={cards}
+                {...msgCardProps}
+                onClose={() => setActiveTab("home")}
+                onRandom={openRandom}
+                onExport={() => setShowExport(true)}
+                onSmartSearch={(query, signal) => intelligentFind(query, cards, undefined, signal)}
+              />
+            </>
           ) : (
           <div style={{ flex: 1, paddingBottom: 28 }}>
             {cardsLoading ? (
@@ -1556,24 +1499,32 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
                 <p style={{ fontSize: 14, color: C.faint, fontFamily: FONT_SANS }}>Loading your library…</p>
               </div>
             ) : showEmpty ? (
-              <EmptyState
+              <WelcomeLetter
                 onSave={() => {
                   setInput("/add ");
                   inputRef.current?.focus();
                 }}
-                onDemo={runDemo}
               />
             ) : (
               <div style={{ paddingTop: 16 }}>
-                {showWelcome && activeTab === "home" && cards.length > 0 && (
-                  <WelcomeCard onDismiss={dismissWelcome} />
+                {cards.length > 0 && cards.length < 3 && activeTab === "home" && (
+                  <SeedCard />
                 )}
                 {showMorningCard && (
-                  <MorningCard
-                    cards={cards}
-                    onUpdate={updateCard}
-                    currentlyReading={currentlyReading.map((b) => b.book)}
-                  />
+                  <>
+                    <MorningCard
+                      cards={cards}
+                      onUpdate={updateCard}
+                      currentlyReading={currentlyReading.map((b) => b.book)}
+                    />
+                    {activeHint === "nc_hint_morning" && (
+                      <ContextualHint
+                        text="Each morning, a quote surfaces here — a small ritual."
+                        storageKey="nc_hint_morning"
+                        onDismiss={() => dismissHint("nc_hint_morning")}
+                      />
+                    )}
+                  </>
                 )}
                 {milestone && (
                   <MilestoneCard
@@ -1609,6 +1560,13 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
                       />
                     </div>
                   )
+                )}
+                {activeHint === "nc_hint_edit" && (
+                  <ContextualHint
+                    text="Tap any card to edit it."
+                    storageKey="nc_hint_edit"
+                    onDismiss={() => dismissHint("nc_hint_edit")}
+                  />
                 )}
                 {loading && <Thinking label={loadingLabel} />}
                 <div ref={bottomRef} />
@@ -1700,6 +1658,13 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
               </div>
             )}
 
+            {activeHint === "nc_hint_commands" && (
+              <ContextualHint
+                text="Type / to see what's possible."
+                storageKey="nc_hint_commands"
+                onDismiss={() => dismissHint("nc_hint_commands")}
+              />
+            )}
             <div style={{ position: "relative" }}>
               {showCmdPalette && (
                 <CommandPalette
@@ -1741,6 +1706,7 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
                 onFocusCapture={(e) => {
                   e.currentTarget.style.boxShadow = C.inputShadowFocus;
                   e.currentTarget.style.borderColor = C.borderHover;
+                  if (cards.length > 0) showHint("nc_hint_commands");
                 }}
                 onBlurCapture={(e) => {
                   e.currentTarget.style.boxShadow = C.inputShadow;
