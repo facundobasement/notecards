@@ -31,6 +31,11 @@ import {
   Star,
   LayoutList,
   Share2,
+  Moon,
+  Sun,
+  LogOut,
+  Trash2,
+  User,
 } from "lucide-react";
 
 // ─── Mobile ──────────────────────────────────────────────────────────────────
@@ -4774,6 +4779,181 @@ export const ExportPanel = memo(function ExportPanel({
     </div>
   );
 });
+
+// ─── AccountPanel ────────────────────────────────────────────────────────────
+export type UserMeta = { name: string; email: string; avatar: string };
+
+export function AccountPanel({
+  userMeta,
+  dark,
+  onToggleDark,
+  onSignOut,
+  onDeleteAccount,
+  onUpdateName,
+}: {
+  userMeta: UserMeta;
+  dark: boolean;
+  onToggleDark: () => void;
+  onSignOut: () => void;
+  onDeleteAccount: () => void;
+  onUpdateName: (name: string) => void;
+}) {
+  const C = useC();
+  const mob = useContext(MobileCtx);
+  const T = makeT(C, mob);
+  const [name, setName] = useState(userMeta.name);
+  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [showDeleteFlow, setShowDeleteFlow] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const nameChanged = name.trim() !== userMeta.name;
+
+  const handleSaveName = async () => {
+    if (!nameChanged) return;
+    setSaving(true);
+    onUpdateName(name.trim());
+    setSaving(false);
+  };
+
+  const initial = (userMeta.name || userMeta.email || "?")[0].toUpperCase();
+
+  return (
+    <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
+      <div style={{ padding: mob ? "32px 0" : "48px 0" }}>
+        {/* Profile Header */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, marginBottom: 32 }}>
+          {userMeta.avatar ? (
+            <img
+              src={userMeta.avatar}
+              alt=""
+              referrerPolicy="no-referrer"
+              style={{ width: 64, height: 64, borderRadius: "50%", border: `1px solid ${C.border}` }}
+            />
+          ) : (
+            <div style={{
+              width: 64, height: 64, borderRadius: "50%",
+              background: C.surface, border: `1px solid ${C.border}`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontFamily: FONT_SERIF, fontSize: 24, fontWeight: 600, color: C.ink,
+            }}>
+              {initial}
+            </div>
+          )}
+          <p style={{ ...T.caption, color: C.muted }}>{userMeta.email}</p>
+        </div>
+
+        <Divider />
+
+        {/* Display Name */}
+        <div style={{ padding: "20px 0" }}>
+          <label style={{ ...T.label, display: "block", marginBottom: 8 }}>Display name</label>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              style={{
+                flex: 1, padding: "8px 12px", fontSize: 14, fontFamily: FONT_SANS,
+                border: `1px solid ${C.border}`, borderRadius: R.md,
+                background: "transparent", color: C.ink, outline: "none",
+              }}
+              onFocus={(e) => (e.currentTarget.style.borderColor = C.ink)}
+              onBlur={(e) => (e.currentTarget.style.borderColor = C.border)}
+            />
+            {nameChanged && (
+              <Btn C={C} size="sm" variant="outline" onClick={handleSaveName} disabled={saving}>
+                {saving ? "…" : "Save"}
+              </Btn>
+            )}
+          </div>
+        </div>
+
+        <Divider />
+
+        {/* Preferences */}
+        <div style={{ padding: "20px 0" }}>
+          <label style={{ ...T.label, display: "block", marginBottom: 12 }}>Preferences</label>
+          <button
+            onClick={onToggleDark}
+            style={{
+              display: "flex", alignItems: "center", gap: 12, width: "100%",
+              padding: "10px 0", background: "none", border: "none",
+              cursor: "pointer", fontFamily: FONT_SANS, fontSize: 14, color: C.ink,
+            }}
+          >
+            {dark ? <Sun size={16} color={C.muted} /> : <Moon size={16} color={C.muted} />}
+            <span>{dark ? "Switch to light mode" : "Switch to dark mode"}</span>
+          </button>
+        </div>
+
+        <Divider />
+
+        {/* Account Actions */}
+        <div style={{ padding: "20px 0" }}>
+          <button
+            onClick={onSignOut}
+            style={{
+              display: "flex", alignItems: "center", gap: 10, width: "100%",
+              padding: "10px 0", background: "none", border: "none",
+              cursor: "pointer", fontFamily: FONT_SANS, fontSize: 14, color: C.ink,
+            }}
+          >
+            <LogOut size={16} color={C.muted} />
+            <span>Sign out</span>
+          </button>
+        </div>
+
+        <Divider />
+
+        {/* Delete Account */}
+        <div style={{ padding: "20px 0" }}>
+          {!showDeleteFlow ? (
+            <button
+              onClick={() => setShowDeleteFlow(true)}
+              style={{
+                display: "flex", alignItems: "center", gap: 10, width: "100%",
+                padding: "10px 0", background: "none", border: "none",
+                cursor: "pointer", fontFamily: FONT_SANS, fontSize: 14, color: C.danger,
+              }}
+            >
+              <Trash2 size={16} />
+              <span>Delete my account</span>
+            </button>
+          ) : (
+            <div>
+              <p style={{ ...T.body, fontSize: 13, color: C.danger, marginBottom: 12, lineHeight: 1.6 }}>
+                This will permanently delete all your notecards and account data.
+                Type <strong>delete</strong> to confirm.
+              </p>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  value={deleteConfirm}
+                  onChange={(e) => setDeleteConfirm(e.target.value)}
+                  placeholder="Type delete"
+                  style={{
+                    flex: 1, padding: "8px 12px", fontSize: 14, fontFamily: FONT_SANS,
+                    border: `1px solid ${C.danger}`, borderRadius: R.md,
+                    background: "transparent", color: C.ink, outline: "none",
+                  }}
+                />
+                <Btn
+                  C={C}
+                  size="sm"
+                  style={{ background: C.danger, color: "#fff", borderColor: C.danger, opacity: deleteConfirm === "delete" ? 1 : 0.4 }}
+                  onClick={() => { if (deleteConfirm === "delete") onDeleteAccount(); }}
+                  disabled={deleteConfirm !== "delete"}
+                >
+                  Confirm
+                </Btn>
+                <Btn C={C} size="sm" variant="ghost" onClick={() => { setShowDeleteFlow(false); setDeleteConfirm(""); }}>
+                  Cancel
+                </Btn>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export const EmptyState = memo(function EmptyState({
   onSave,

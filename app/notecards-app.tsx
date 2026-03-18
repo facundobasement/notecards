@@ -36,6 +36,8 @@ import {
   BookPalette,
   MorningCard,
   WelcomeCard,
+  AccountPanel,
+  type UserMeta,
 } from "./notecards-components";
 
 const NOW = () => Date.now();
@@ -523,9 +525,11 @@ async function generateReadingMode(cards: any[], signal: AbortSignal) {
 
 type NotecardsAppProps = {
   userId: string;
+  userMeta?: UserMeta;
+  onSignOut?: () => void;
 };
 
-export default function NotecardsApp({ userId }: NotecardsAppProps) {
+export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsAppProps) {
   const isMobile = useIsMobile();
   const [cards, dispatch] = useReducer(cardsReducer, []);
   const [dark, setDark] = useState(false);
@@ -543,7 +547,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
   const [searchingBooks, setSearchingBooks] = useState(false);
   const [selectedBook, setSelectedBook] = useState<any>(null);
   const [authorDraft, setAuthorDraft] = useState("");
-  const [activeTab, setActiveTab] = useState<"home" | "library">("home");
+  const [activeTab, setActiveTab] = useState<"home" | "library" | "account">("home");
   const [showExport, setShowExport] = useState(false);
   const [showCmdPalette, setShowCmdPalette] = useState(false);
   const [cmdQuery, setCmdQuery] = useState("");
@@ -1270,7 +1274,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
             <div
               style={{
                 display: "flex",
-                gap: 0,
+                alignItems: "center",
                 borderBottom: `1px solid ${C.border}`,
                 flexShrink: 0,
                 marginTop: 8,
@@ -1308,10 +1312,62 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
                   {tab.label}
                 </button>
               ))}
+              <div style={{ marginLeft: "auto", padding: "4px 0" }}>
+                <button
+                  onClick={() => setActiveTab(activeTab === "account" ? "home" : "account")}
+                  title="Account"
+                  style={{
+                    width: isMobile ? 32 : 26,
+                    height: isMobile ? 32 : 26,
+                    borderRadius: "50%",
+                    border: activeTab === "account" ? `2px solid ${C.ink}` : `1px solid ${C.border}`,
+                    background: "transparent",
+                    cursor: "pointer",
+                    padding: 0,
+                    overflow: "hidden",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    transition: "border-color 0.15s",
+                  }}
+                >
+                  {userMeta?.avatar ? (
+                    <img src={userMeta.avatar} alt="" referrerPolicy="no-referrer" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  ) : (
+                    <span style={{ fontSize: 11, fontFamily: FONT_SERIF, fontWeight: 600, color: C.ink }}>
+                      {(userMeta?.name || userMeta?.email || "?")[0].toUpperCase()}
+                    </span>
+                  )}
+                </button>
+              </div>
             </div>
           )}
 
-          {activeTab === "library" && !showEmpty && !cardsLoading ? (
+          {activeTab === "account" && userMeta ? (
+            <AccountPanel
+              userMeta={userMeta}
+              dark={dark}
+              onToggleDark={() => setDark((d) => !d)}
+              onSignOut={() => onSignOut?.()}
+              onDeleteAccount={async () => {
+                try {
+                  const { data: { session } } = await supabase.auth.getSession();
+                  if (!session) return;
+                  await fetch("/api/delete-account", {
+                    method: "DELETE",
+                    headers: { Authorization: `Bearer ${session.access_token}` },
+                  });
+                  await supabase.auth.signOut();
+                  onSignOut?.();
+                } catch (e) {
+                  console.error("Delete account failed:", e);
+                }
+              }}
+              onUpdateName={async (name) => {
+                await supabase.auth.updateUser({ data: { full_name: name } });
+              }}
+            />
+          ) : activeTab === "library" && !showEmpty && !cardsLoading ? (
             <LibraryPanel
               cards={cards}
               {...msgCardProps}
