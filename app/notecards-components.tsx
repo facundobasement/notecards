@@ -277,8 +277,6 @@ export function getPlaceholder(
   if (flowStage === "book") return "Search for a book…";
   if (flowStage === "author")
     return "Author name (or press Enter to skip)…";
-  if (flowStage === "location")
-    return "Page, chapter, or location (Enter to skip)…";
   if (flowStage === "import")
     return "Paste quotes, a reading list, or any text with quotes…";
   if (!cards.length) return `/add "a quote that stayed with you"`;
