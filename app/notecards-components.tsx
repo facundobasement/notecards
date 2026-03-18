@@ -1083,7 +1083,9 @@ const CardDetailDrawer = memo(function CardDetailDrawer({
   useEffect(() => {
     if (inputContainerRef?.current) {
       const rect = inputContainerRef.current.getBoundingClientRect();
-      setDrawerStyle({ left: rect.left, width: rect.width });
+      if (rect.width > 0) {
+        setDrawerStyle({ left: rect.left, width: rect.width });
+      }
     }
     const t = requestAnimationFrame(() => setVisible(true));
     return () => cancelAnimationFrame(t);
@@ -1174,19 +1176,22 @@ const CardDetailDrawer = memo(function CardDetailDrawer({
         style={{
           position: "fixed",
           bottom: 0,
-          left: drawerStyle.left ?? 0,
-          width: drawerStyle.width ?? "100%",
+          ...(drawerStyle.width != null
+            ? { left: drawerStyle.left, width: drawerStyle.width }
+            : { left: "50%", maxWidth: 640 - 56, width: "calc(100% - 56px)" }),
           zIndex: 301,
           background: C.base,
           borderTop: `1px solid ${C.border}`,
-          borderLeft: drawerStyle.width != null ? `1px solid ${C.border}` : undefined,
-          borderRight: drawerStyle.width != null ? `1px solid ${C.border}` : undefined,
+          borderLeft: `1px solid ${C.border}`,
+          borderRight: `1px solid ${C.border}`,
           borderRadius: `${R.xl}px ${R.xl}px 0 0`,
           boxShadow: "0 -8px 40px rgba(0,0,0,0.1)",
           maxHeight: "80vh",
           display: "flex",
           flexDirection: "column",
-          transform: visible ? "translateY(0)" : "translateY(100%)",
+          transform: drawerStyle.width != null
+            ? (visible ? "translateY(0)" : "translateY(100%)")
+            : (visible ? "translateX(-50%)" : "translateX(-50%) translateY(100%)"),
           transition: "transform 0.28s cubic-bezier(0.32,0.72,0,1)",
         }}
       >
