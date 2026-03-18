@@ -4280,6 +4280,7 @@ export const LibraryPanel = memo(function LibraryPanel({
         flexDirection: "column",
         fontFamily: FONT_SANS,
         minHeight: 0,
+        overflow: "hidden",
       }}
     >
       <div
@@ -4519,7 +4520,7 @@ export const LibraryPanel = memo(function LibraryPanel({
           />
         </div>
       </div>
-      <div ref={scrollRef} style={{ flex: 1, overflowY: "auto" }}>
+      <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
         <div
           style={{
             padding: "4px 0 100px",
