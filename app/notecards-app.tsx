@@ -1258,6 +1258,7 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
           <ExportPanel cards={cards} onClose={() => setShowExport(false)} />
         )}
         <div
+          className="nc-app-enter"
           style={{
             maxWidth: 640,
             width: "100%",
@@ -1371,8 +1372,8 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
               position: "sticky",
               bottom: 0,
               paddingBottom: 32,
-              paddingTop: 16,
-              background: `linear-gradient(to bottom, transparent, ${C.base} 20px)`,
+              paddingTop: 28,
+              background: `linear-gradient(to bottom, transparent, ${C.base})`,
             }}
           >
             {pastePrompt && !flowStage && (

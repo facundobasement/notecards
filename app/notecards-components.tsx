@@ -84,6 +84,7 @@ export const LIGHT: Theme = {
   inputBg: "#ffffff",
   inputShadow: "0 2px 20px rgba(0,0,0,0.07)",
   inputShadowFocus: "0 4px 28px rgba(0,0,0,0.10)",
+  cardHoverShadow: "0 2px 12px rgba(0,0,0,0.04)",
 };
 export const DARK: Theme = {
   ink: "#f0ede8",
@@ -107,6 +108,7 @@ export const DARK: Theme = {
   inputBg: "#1e1d1a",
   inputShadow: "0 2px 16px rgba(0,0,0,0.35)",
   inputShadowFocus: "0 4px 28px rgba(0,0,0,0.5)",
+  cardHoverShadow: "0 2px 12px rgba(0,0,0,0.2)",
 };
 
 export const ThemeCtx = createContext<Theme>(LIGHT);
@@ -1650,7 +1652,9 @@ export const NoteCard = memo(function NoteCard({
               : hovered
               ? C.surface
               : "transparent",
-            transition: "background 0.15s ease",
+            boxShadow: hovered ? C.cardHoverShadow : "none",
+            transform: hovered ? "translateY(-1px)" : "translateY(0)",
+            transition: "background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease",
             cursor: selectable ? "pointer" : "default",
           }}
           className="nc-card"
@@ -3604,7 +3608,7 @@ export const RandomCard = memo(function RandomCard({
         justifyContent: "center",
         padding: mob ? 20 : 48,
         fontFamily: FONT_SANS,
-        background: C.base,
+        background: `radial-gradient(ellipse at center, ${C.base} 0%, ${C.surface} 100%)`,
       }}
     >
       <button
@@ -4511,7 +4515,11 @@ export const LibraryPanel = memo(function LibraryPanel({
                     display: "flex",
                     alignItems: "baseline",
                     gap: 8,
-                    marginBottom: 10,
+                    marginBottom: 4,
+                    padding: "10px 14px",
+                    borderLeft: `2px solid ${C.sage}`,
+                    background: C.sageBg,
+                    borderRadius: `0 ${R.sm}px ${R.sm}px 0`,
                   }}
                 >
                   <span style={{ ...T.book, fontSize: 11 }}>{heading}</span>
@@ -4523,20 +4531,30 @@ export const LibraryPanel = memo(function LibraryPanel({
                       {fmtYear(groupCards[0].year)}
                     </span>
                   )}
-                  <span style={{ ...T.meta, marginLeft: "auto" }}>
+                  <span style={{
+                    ...T.meta,
+                    marginLeft: "auto",
+                    background: C.surface,
+                    padding: "1px 7px",
+                    borderRadius: R.pill,
+                    fontSize: 11,
+                  }}>
                     {groupCards.length}
                   </span>
                 </div>
-                <Divider />
-                {groupCards.map((c) => (
-                  <NoteCard key={c.id} card={c} compact {...cardProps} />
+                {groupCards.map((c, i) => (
+                  <div key={c.id} className="nc-card-enter" style={{ "--i": i } as React.CSSProperties}>
+                    <NoteCard card={c} compact {...cardProps} />
+                  </div>
                 ))}
               </div>
             ))
           ) : (
             <div style={{ paddingTop: 12 }}>
-              {[...visible].sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0)).map((c) => (
-                <NoteCard key={c.id} card={c} {...cardProps} />
+              {[...visible].sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0)).map((c, i) => (
+                <div key={c.id} className="nc-card-enter" style={{ "--i": i } as React.CSSProperties}>
+                  <NoteCard card={c} {...cardProps} />
+                </div>
               ))}
             </div>
           )}
