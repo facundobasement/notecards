@@ -35,6 +35,7 @@ import {
   CommandPalette,
   BookPalette,
   MorningCard,
+  WelcomeCard,
 } from "./notecards-components";
 
 const NOW = () => Date.now();
@@ -549,11 +550,17 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
   const [pastePrompt, setPastePrompt] = useState<string | null>(null);
   const [randomCard, setRandomCard] = useState<any>(null);
   const [showMorningCard, setShowMorningCard] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(() => typeof window !== "undefined" && !localStorage.getItem("nc_onboarding_dismissed_v1"));
   const [savedCardId, setSavedCardId] = useState<string | null>(null);
   const [tagDrawer, setTagDrawer] = useState<any>(null);
   const [undoToast, setUndoToast] = useState<{ card: any; timer: ReturnType<typeof setTimeout> } | null>(null);
 
   const C = dark ? DARK : LIGHT;
+
+  const dismissWelcome = () => {
+    localStorage.setItem("nc_onboarding_dismissed_v1", "1");
+    setShowWelcome(false);
+  };
 
   const cardsRef = useRef(cards);
   const messagesRef = useRef(messages);
@@ -1340,6 +1347,9 @@ export default function NotecardsApp({ userId }: NotecardsAppProps) {
               />
             ) : (
               <div style={{ paddingTop: 16 }}>
+                {showWelcome && activeTab === "home" && cards.length > 0 && (
+                  <WelcomeCard onDismiss={dismissWelcome} />
+                )}
                 {showMorningCard && (
                   <MorningCard
                     cards={cards}

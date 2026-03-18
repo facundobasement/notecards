@@ -3817,6 +3817,48 @@ export const RandomCard = memo(function RandomCard({
   );
 });
 
+// ─── WelcomeCard ─────────────────────────────────────────────────────────────
+export function WelcomeCard({ onDismiss }: { onDismiss: () => void }) {
+  const C = useC();
+  const mob = useContext(MobileCtx);
+  const T = makeT(C, mob);
+  const tips = [
+    { label: "Commands", text: "Type / in the input to see what\u2019s possible \u2014 save quotes, ask AI, explore your library." },
+    { label: "Edit", text: "Click any card to edit its quote, book, author, or tags." },
+    { label: "Star", text: "Star your favorite quotes to find them easily later." },
+    { label: "Library", text: "Switch to the Library tab to browse all your cards by book, tag, or date." },
+    { label: "Morning card", text: "Each morning, a random quote appears at the top of your feed \u2014 a small ritual." },
+  ];
+  return (
+    <div style={{ padding: mob ? "20px 0" : "28px 0", animation: "fadeIn 0.5s ease both" }}>
+      <div style={{ width: 20, height: 1, background: C.border, margin: "0 auto 20px" }} />
+      <h2 style={{
+        fontFamily: FONT_SERIF,
+        fontSize: mob ? 18 : 20,
+        fontWeight: 600,
+        color: C.ink,
+        textAlign: "center",
+        marginBottom: 20,
+        fontStyle: "italic",
+      }}>
+        A few things worth knowing.
+      </h2>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {tips.map((tip) => (
+          <p key={tip.label} style={{ ...T.body, fontSize: mob ? 13 : 14, lineHeight: 1.6 }}>
+            <strong style={{ color: C.ink }}>{tip.label}</strong>
+            <span style={{ color: C.muted }}>{" \u2014 "}{tip.text}</span>
+          </p>
+        ))}
+      </div>
+      <div style={{ textAlign: "center", marginTop: 24 }}>
+        <Btn C={C} size="sm" onClick={onDismiss}>Got it</Btn>
+      </div>
+      <div style={{ width: 20, height: 1, background: C.border, margin: "20px auto 0" }} />
+    </div>
+  );
+}
+
 // ─── MorningCard ──────────────────────────────────────────────────────────────
 export const MorningCard = memo(function MorningCard({
   cards,
