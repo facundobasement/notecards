@@ -9,6 +9,7 @@ import {
   createContext,
   useContext,
 } from "react";
+import { createPortal } from "react-dom";
 import {
   X,
   Check,
@@ -1112,6 +1113,11 @@ const CardDetailDrawer = memo(function CardDetailDrawer({
     return () => clearTimeout(t);
   }, []);
 
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, []);
+
 
   const wordCount = note.trim() ? note.trim().split(/\s+/).length : 0;
 
@@ -1620,7 +1626,7 @@ export const NoteCard = memo(function NoteCard({
 
   return (
     <>
-      {showDetail && (
+      {showDetail && createPortal(
         <CardDetailDrawer
           card={card}
           allCards={allCards}
@@ -1628,10 +1634,12 @@ export const NoteCard = memo(function NoteCard({
           onTagsChange={onTagsChange}
           onClose={() => setShowDetail(false)}
           inputContainerRef={inputContainerRef}
-        />
+        />,
+        document.body
       )}
-      {showShare && (
-        <ShareCardModal card={card} onClose={() => setShowShare(false)} />
+      {showShare && createPortal(
+        <ShareCardModal card={card} onClose={() => setShowShare(false)} />,
+        document.body
       )}
       <div
         onMouseEnter={() => setHovered(true)}
