@@ -22,20 +22,16 @@ import {
   Sparkles,
   Download,
   Copy,
-  Zap,
   FileText,
-  FolderPlus,
   MoreHorizontal,
   ChevronDown,
   ChevronUp,
   Star,
-  LayoutList,
   Share2,
   Moon,
   Sun,
   LogOut,
   Trash2,
-  User,
 } from "lucide-react";
 
 // ─── Mobile ──────────────────────────────────────────────────────────────────
@@ -568,18 +564,14 @@ export const Thinking = memo(function Thinking({
   );
 });
 
-export function useKey(
-  key: string,
-  handler: (e: KeyboardEvent) => void,
-  deps: React.DependencyList = []
-) {
+export function useKey(key: string, handler: () => void) {
+  const ref = useRef(handler);
+  useEffect(() => { ref.current = handler; });
   useEffect(() => {
-    const h = (e: KeyboardEvent) => {
-      if (e.key === key) handler(e);
-    };
+    const h = (e: KeyboardEvent) => { if (e.key === key) ref.current(); };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
-  }, deps);
+  }, [key]);
 }
 
 
@@ -624,7 +616,7 @@ export const TagPickerDrawer = memo(function TagPickerDrawer({
     const t = setTimeout(() => inputRef.current?.focus(), 300);
     return () => clearTimeout(t);
   }, []);
-  useKey("Escape", onDiscard, [onDiscard]);
+  useKey("Escape", onDiscard);
 
   const toggle = (t: string) =>
     setSelected((p) =>
@@ -1159,7 +1151,7 @@ const CardDetailDrawer = memo(function CardDetailDrawer({
     onClose();
   };
 
-  useKey("Escape", handleSave, [handleSave]);
+  useKey("Escape", handleSave);
 
   const toggle = (section: string) =>
     setExpandedSection((p) => (p === section ? "" : section));
@@ -3322,7 +3314,7 @@ export const ShareCardModal = memo(function ShareCardModal({
     return () => cancelAnimationFrame(t);
   }, []);
 
-  useKey("Escape", onClose, [onClose]);
+  useKey("Escape", onClose);
 
   useEffect(() => {
     const canvas = renderCardToCanvas(card, C);
@@ -3598,7 +3590,7 @@ export const RandomCard = memo(function RandomCard({
     setShowReflect(false);
     setNewThought("");
   }, [card.id]);
-  useKey("Escape", onClose, [onClose]);
+  useKey("Escape", onClose);
 
   const submitReflection = () => {
     if (!newThought.trim() || !onUpdate) return;
@@ -3827,17 +3819,18 @@ export const RandomCard = memo(function RandomCard({
 });
 
 // ─── WelcomeCard ─────────────────────────────────────────────────────────────
+const WELCOME_TIPS = [
+  { label: "Commands", text: "Type / in the input to see what\u2019s possible \u2014 save quotes, ask AI, explore your library." },
+  { label: "Edit", text: "Click any card to edit its quote, book, author, or tags." },
+  { label: "Star", text: "Star your favorite quotes to find them easily later." },
+  { label: "Library", text: "Switch to the Library tab to browse all your cards by book, tag, or date." },
+  { label: "Morning card", text: "Each morning, a random quote appears at the top of your feed \u2014 a small ritual." },
+];
 export function WelcomeCard({ onDismiss }: { onDismiss: () => void }) {
   const C = useC();
   const mob = useContext(MobileCtx);
   const T = makeT(C, mob);
-  const tips = [
-    { label: "Commands", text: "Type / in the input to see what\u2019s possible \u2014 save quotes, ask AI, explore your library." },
-    { label: "Edit", text: "Click any card to edit its quote, book, author, or tags." },
-    { label: "Star", text: "Star your favorite quotes to find them easily later." },
-    { label: "Library", text: "Switch to the Library tab to browse all your cards by book, tag, or date." },
-    { label: "Morning card", text: "Each morning, a random quote appears at the top of your feed \u2014 a small ritual." },
-  ];
+  const tips = WELCOME_TIPS;
   return (
     <div style={{ padding: mob ? "20px 0" : "28px 0", animation: "fadeIn 0.5s ease both" }}>
       <div style={{ width: 20, height: 1, background: C.border, margin: "0 auto 20px" }} />
@@ -4273,13 +4266,13 @@ export const LibraryPanel = memo(function LibraryPanel({
   const starredCount = useMemo(() => cards.filter((c) => c.starred).length, [cards]);
   const bookCount = useMemo(() => new Set(cards.map((c) => c.book.toLowerCase())).size, [cards]);
   const hasFilters = filters.length > 0 || search.trim().length > 0;
-  const cardProps = {
+  const cardProps = useMemo(() => ({
     onUpdate,
     onTagsChange,
     onDelete,
     allCards: allCards ?? cards,
     inputContainerRef,
-  };
+  }), [onUpdate, onTagsChange, onDelete, allCards, cards, inputContainerRef]);
 
   return (
     <div
@@ -4638,7 +4631,7 @@ export const ExportPanel = memo(function ExportPanel({
 
   const exportText = useMemo(() => cards.map(cardToExport).join("\n"), [cards]);
 
-  useKey("Escape", onClose, [onClose]);
+  useKey("Escape", onClose);
 
   const doCopy = async () => {
     await copyText(exportText);
@@ -4796,7 +4789,7 @@ export function AccountPanel({
   onToggleDark: () => void;
   onSignOut: () => void;
   onDeleteAccount: () => void;
-  onUpdateName: (name: string) => void;
+  onUpdateName: (name: string) => Promise<void>;
 }) {
   const C = useC();
   const mob = useContext(MobileCtx);
@@ -4810,8 +4803,7 @@ export function AccountPanel({
   const handleSaveName = async () => {
     if (!nameChanged) return;
     setSaving(true);
-    onUpdateName(name.trim());
-    setSaving(false);
+    try { await onUpdateName(name.trim()); } finally { setSaving(false); }
   };
 
   const initial = (userMeta.name || userMeta.email || "?")[0].toUpperCase();

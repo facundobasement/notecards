@@ -8,7 +8,7 @@ import {
   useMemo,
   useReducer,
 } from "react";
-import { Moon, Sun, ArrowUp, X, MessageSquare, LayoutGrid } from "lucide-react";
+import { ArrowUp, X, MessageSquare, LayoutGrid } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import {
   ThemeCtx,
@@ -1179,6 +1179,26 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
     return () => document.removeEventListener("keydown", handler);
   }, []);
 
+  const handleDeleteAccount = useCallback(async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch("/api/delete-account", {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!res.ok) { console.error("Delete account failed:", res.status); return; }
+      await supabase.auth.signOut();
+      onSignOut?.();
+    } catch (e) {
+      console.error("Delete account failed:", e);
+    }
+  }, [onSignOut]);
+
+  const handleUpdateName = useCallback(async (name: string) => {
+    await supabase.auth.updateUser({ data: { full_name: name } });
+  }, []);
+
   const showEmpty = !cardsLoading && cards.length === 0 && messages.length === 0;
   const hasInput = input.trim().length > 0;
   const msgCardProps = useMemo(() => ({
@@ -1200,41 +1220,6 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
           ::selection{background:${C.surfaceAlt}}
           ::-webkit-scrollbar-thumb{background:${C.border}}
         `}</style>
-
-        <button
-          onClick={() => setDark((d) => !d)}
-          title={dark ? "Switch to light" : "Switch to dark"}
-          style={{
-            position: "fixed",
-            bottom: 28,
-            right: 24,
-            zIndex: 40,
-            width: 32,
-            height: 32,
-            borderRadius: "50%",
-            border: `1px solid ${C.border}`,
-            background: "transparent",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: C.faint,
-            opacity: 0.5,
-            transition: "all 0.2s ease",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.opacity = "1";
-            e.currentTarget.style.color = C.ink;
-            e.currentTarget.style.borderColor = C.borderHover;
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.opacity = "0.5";
-            e.currentTarget.style.color = C.faint;
-            e.currentTarget.style.borderColor = C.border;
-          }}
-        >
-          {dark ? <Sun size={13} /> : <Moon size={13} />}
-        </button>
 
         {tagDrawer && (
           <TagPickerDrawer
@@ -1348,24 +1333,9 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
               userMeta={userMeta}
               dark={dark}
               onToggleDark={() => setDark((d) => !d)}
-              onSignOut={() => onSignOut?.()}
-              onDeleteAccount={async () => {
-                try {
-                  const { data: { session } } = await supabase.auth.getSession();
-                  if (!session) return;
-                  await fetch("/api/delete-account", {
-                    method: "DELETE",
-                    headers: { Authorization: `Bearer ${session.access_token}` },
-                  });
-                  await supabase.auth.signOut();
-                  onSignOut?.();
-                } catch (e) {
-                  console.error("Delete account failed:", e);
-                }
-              }}
-              onUpdateName={async (name) => {
-                await supabase.auth.updateUser({ data: { full_name: name } });
-              }}
+              onSignOut={onSignOut ?? (() => {})}
+              onDeleteAccount={handleDeleteAccount}
+              onUpdateName={handleUpdateName}
             />
           ) : activeTab === "library" && !showEmpty && !cardsLoading ? (
             <LibraryPanel

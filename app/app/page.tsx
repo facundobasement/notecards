@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import NotecardsApp from "../notecards-app";
@@ -40,10 +40,10 @@ export default function AppPage() {
     };
   }, [router]);
 
-  const handleSignOut = async () => {
+  const handleSignOut = useCallback(async () => {
     await supabase.auth.signOut();
     router.replace("/");
-  };
+  }, [router]);
 
   if (checking || !userId) {
     return (
