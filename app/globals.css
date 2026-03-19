@@ -59,6 +59,9 @@ textarea, input { font-family: inherit; }
   ::-webkit-scrollbar-thumb { border-radius: 4px; }
 }
 
+.nc-lib-scroll { scrollbar-width: none; }
+.nc-lib-scroll::-webkit-scrollbar { display: none; }
+
 /* Card entrance stagger */
 @keyframes cardEnter {
   from { opacity: 0; }
