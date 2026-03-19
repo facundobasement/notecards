@@ -32,6 +32,7 @@ import {
   Sun,
   LogOut,
   Trash2,
+  Mail,
 } from "lucide-react";
 
 // ─── Mobile ──────────────────────────────────────────────────────────────────
@@ -5470,7 +5471,7 @@ export const ExportPanel = memo(function ExportPanel({
 });
 
 // ─── AccountPanel ────────────────────────────────────────────────────────────
-export type UserMeta = { name: string; email: string; avatar: string };
+export type UserMeta = { name: string; email: string; avatar: string; digestOptout?: boolean };
 
 export function AccountPanel({
   userMeta,
@@ -5479,6 +5480,8 @@ export function AccountPanel({
   onSignOut,
   onDeleteAccount,
   onUpdateName,
+  digestOptout,
+  onToggleDigest,
 }: {
   userMeta: UserMeta;
   dark: boolean;
@@ -5486,6 +5489,8 @@ export function AccountPanel({
   onSignOut: () => void;
   onDeleteAccount: () => void;
   onUpdateName: (name: string) => Promise<void>;
+  digestOptout?: boolean;
+  onToggleDigest?: () => void;
 }) {
   const C = useC();
   const mob = useContext(MobileCtx);
@@ -5570,6 +5575,20 @@ export function AccountPanel({
             {dark ? <Sun size={16} color={C.muted} /> : <Moon size={16} color={C.muted} />}
             <span>{dark ? "Switch to light mode" : "Switch to dark mode"}</span>
           </button>
+          {onToggleDigest && (
+            <button
+              onClick={onToggleDigest}
+              style={{
+                display: "flex", alignItems: "center", gap: 12, width: "100%",
+                padding: "10px 0", background: "none", border: "none",
+                cursor: "pointer", fontFamily: FONT_SANS, fontSize: 14, color: C.ink,
+              }}
+            >
+              <Mail size={16} color={C.muted} />
+              <span style={{ flex: 1, textAlign: "left" }}>Weekly reading digest</span>
+              <span style={{ fontSize: 12, color: C.faint }}>{digestOptout ? "Off" : "On"}</span>
+            </button>
+          )}
         </div>
 
         <Divider />
