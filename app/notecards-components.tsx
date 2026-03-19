@@ -3201,7 +3201,7 @@ export const FilterBar = memo(function FilterBar({
             style={{
               position: "absolute",
               top: "calc(100% + 6px)",
-              left: 0,
+              right: 0,
               zIndex: 90,
               background: C.base,
               border: `1px solid ${C.border}`,
@@ -3241,7 +3241,7 @@ export const FilterBar = memo(function FilterBar({
             style={{
               position: "absolute",
               top: "calc(100% + 6px)",
-              left: 0,
+              right: 0,
               zIndex: 90,
               background: C.base,
               border: `1px solid ${C.border}`,
