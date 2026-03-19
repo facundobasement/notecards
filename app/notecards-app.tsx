@@ -1495,6 +1495,7 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
             width: "100%",
             margin: "0 auto",
             padding: isMobile ? "0 16px" : "0 28px",
+            paddingBottom: isMobile ? "env(safe-area-inset-bottom, 0px)" : undefined,
             display: "flex",
             flexDirection: "column",
             minHeight: "100vh",
@@ -1990,7 +1991,7 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
                         border: "none",
                         outline: "none",
                         resize: "none",
-                        fontSize: 14,
+                        fontSize: isMobile ? 16 : 14,
                         lineHeight: 1.75,
                         background: "transparent",
                         maxHeight: flowStage === "import" ? 200 : 120,
@@ -2052,7 +2053,7 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
         {undoToast && (
           <div style={{
             position: "fixed",
-            bottom: 28,
+            bottom: isMobile ? 100 : 28,
             left: "50%",
             transform: "translateX(-50%)",
             background: C.ink,

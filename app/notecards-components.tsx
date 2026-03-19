@@ -441,13 +441,17 @@ export const Tag = memo(function Tag({
             border: "none",
             cursor: "pointer",
             color: C.faint,
-            padding: 0,
+            padding: 4,
             display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
             lineHeight: 1,
             marginLeft: 1,
+            minWidth: 24,
+            minHeight: 24,
           }}
         >
-          <X size={8} />
+          <X size={10} />
         </button>
       )}
     </span>
@@ -519,12 +523,16 @@ export const Chip = memo(function Chip({
             cursor: "pointer",
             color: "inherit",
             opacity: 0.5,
-            padding: 0,
+            padding: 4,
             display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
             lineHeight: 1,
+            minWidth: 24,
+            minHeight: 24,
           }}
         >
-          <X size={9} />
+          <X size={10} />
         </button>
       )}
     </span>
@@ -1573,7 +1581,7 @@ const CardDetailDrawer = memo(function CardDetailDrawer({
                     rows={3}
                     style={{
                       width: "100%",
-                      fontSize: 14,
+                      fontSize: mob ? 16 : 14,
                       fontFamily: FONT_SERIF,
                       lineHeight: 1.7,
                       border: `1px solid ${C.border}`,
@@ -1844,11 +1852,11 @@ export const NoteCard = memo(function NoteCard({
             style={{
               position: "absolute",
               top: py + 2,
-              right: 16,
+              right: mob ? 8 : 16,
               zIndex: 5,
               display: "flex",
               alignItems: "center",
-              gap: 2,
+              gap: mob ? 8 : 2,
             }}
           >
             <button
@@ -3137,7 +3145,7 @@ export const FilterBar = memo(function FilterBar({
             <button
               onClick={() => onRemove(f.id)}
               style={{
-                padding: "3px 6px",
+                padding: mob ? "6px 10px" : "3px 6px",
                 background: "transparent",
                 border: "none",
                 borderLeft: `1px solid ${C.border}`,
@@ -3146,6 +3154,9 @@ export const FilterBar = memo(function FilterBar({
                 display: "inline-flex",
                 alignItems: "center",
                 transition: "background 0.1s",
+                minWidth: mob ? 32 : undefined,
+                minHeight: mob ? 32 : undefined,
+                justifyContent: "center",
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = C.surface;
@@ -3156,7 +3167,7 @@ export const FilterBar = memo(function FilterBar({
                 e.currentTarget.style.color = C.faint;
               }}
             >
-              <X size={10} />
+              <X size={mob ? 12 : 10} />
             </button>
           </div>
         );
@@ -3306,8 +3317,8 @@ export const FilterBar = memo(function FilterBar({
                       placeholder={`Search ${step.label.toLowerCase()}s…`}
                       style={{
                         width: "100%",
-                        padding: "5px 8px",
-                        fontSize: 12,
+                        padding: mob ? "8px 10px" : "5px 8px",
+                        fontSize: mob ? 16 : 12,
                         fontFamily: FONT_SANS,
                         border: `1px solid ${C.border}`,
                         borderRadius: R.sm,
@@ -3968,7 +3979,7 @@ export const RandomCard = memo(function RandomCard({
                 style={{
                   width: "100%",
                   padding: "10px 12px",
-                  fontSize: 13,
+                  fontSize: mob ? 16 : 13,
                   fontFamily: FONT_SERIF,
                   lineHeight: 1.7,
                   border: `1px solid ${C.border}`,
@@ -4737,7 +4748,7 @@ export const MorningCard = memo(function MorningCard({
               style={{
                 width: "100%",
                 padding: "10px 12px",
-                fontSize: 13,
+                fontSize: mob ? 16 : 13,
                 fontFamily: FONT_SERIF,
                 lineHeight: 1.7,
                 border: `1px solid ${C.border}`,
@@ -5276,8 +5287,8 @@ export const LibraryPanel = memo(function LibraryPanel({
               placeholder="Search your library…"
               style={{
                 width: "100%",
-                padding: "7px 28px 7px 30px",
-                fontSize: 13,
+                padding: mob ? "9px 28px 9px 30px" : "7px 28px 7px 30px",
+                fontSize: mob ? 16 : 13,
                 fontFamily: FONT_SANS,
                 border: `1px solid ${C.border}`,
                 borderRadius: R.md,
