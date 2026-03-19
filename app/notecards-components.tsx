@@ -5399,7 +5399,7 @@ export const LibraryPanel = memo(function LibraryPanel({
           />
         </div>
       </div>
-      <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
+      <div ref={scrollRef} className="nc-lib-scroll" style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
         <div
           key={aiResults ? "ai" : "text"}
           style={{
