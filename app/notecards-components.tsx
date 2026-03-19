@@ -684,7 +684,7 @@ export const TagPickerDrawer = memo(function TagPickerDrawer({
           borderRight: `1px solid ${C.border}`,
           borderRadius: `${R.xl}px ${R.xl}px 0 0`,
           boxShadow: "0 -8px 40px rgba(0,0,0,0.12)",
-          maxHeight: "72vh",
+          maxHeight: mob ? "60vh" : "72vh",
           display: "flex",
           flexDirection: "column",
           transform: visible ? "translateY(0)" : "translateY(100%)",
@@ -2374,8 +2374,8 @@ export const ImportBlock = memo(function ImportBlock({
             >
               <div
                 style={{
-                  width: 16,
-                  height: 16,
+                  width: mob ? 22 : 16,
+                  height: mob ? 22 : 16,
                   borderRadius: R.sm,
                   border: `1.5px solid ${on ? C.ink : C.border}`,
                   background: on ? C.ink : "transparent",
@@ -2906,7 +2906,7 @@ export function CommandPalette({
         <Search size={11} style={{ color: C.faint }} />
         <span style={T.label}>Commands</span>
       </div>
-      <div style={{ maxHeight: 268, overflowY: "auto" }}>
+      <div style={{ maxHeight: mob ? 200 : 268, overflowY: "auto" }}>
         {filtered.map((c, i) => (
           <button
             key={c.cmd}
@@ -3636,7 +3636,7 @@ export const ShareCardModal = memo(function ShareCardModal({
 
       <div
         style={{
-          maxWidth: 380,
+          maxWidth: mob ? "100%" : 380,
           width: "100%",
           opacity: visible ? 1 : 0,
           transform: visible ? "translateY(0)" : "translateY(14px)",
@@ -3869,7 +3869,7 @@ export const RandomCard = memo(function RandomCard({
       </button>
       <div
         style={{
-          maxWidth: 540,
+          maxWidth: mob ? "100%" : 540,
           width: "100%",
           opacity: visible ? 1 : 0,
           transform: visible ? "translateY(0)" : "translateY(14px)",
@@ -5516,13 +5516,13 @@ export const LibraryPanel = memo(function LibraryPanel({
                     <button
                       onClick={(e) => { e.stopPropagation(); onTriggerReview(heading); }}
                       style={{
-                        fontSize: 11,
+                        fontSize: mob ? 12 : 11,
                         fontFamily: FONT_SANS,
                         color: C.sage,
                         background: "none",
                         border: "none",
                         cursor: "pointer",
-                        padding: "2px 6px",
+                        padding: mob ? "8px 12px" : "2px 6px",
                         marginLeft: 4,
                       }}
                     >
