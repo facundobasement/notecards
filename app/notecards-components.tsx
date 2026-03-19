@@ -2962,16 +2962,21 @@ export function CommandPalette({
   );
 }
 
-type Filter = { id: string; type: string; value: string };
+type FilterType = "tag" | "starred" | "book" | "author" | "date";
+type Filter = { id: string; type: FilterType; value: string; label?: string };
 export const FilterBar = memo(function FilterBar({
   filters,
   tags,
+  books,
+  authors,
   onAdd,
   onRemove,
   onClearAll,
 }: {
   filters: Filter[];
   tags: { tag: string; count: number }[];
+  books: { book: string; count: number }[];
+  authors: { author: string; count: number }[];
   onAdd: (f: Filter) => void;
   onRemove: (id: string) => void;
   onClearAll: () => void;
@@ -2997,30 +3002,41 @@ export const FilterBar = memo(function FilterBar({
   }, [step]);
 
   const typeOptions = [
-    tags.length && { type: "tag", label: "Tag" },
-    { type: "starred", label: "Starred" },
-  ].filter(Boolean) as { type: string; label: string }[];
+    books.length && !filters.some(f => f.type === "book") && { type: "book" as FilterType, label: "Book" },
+    authors.length && !filters.some(f => f.type === "author") && { type: "author" as FilterType, label: "Author" },
+    tags.length && { type: "tag" as FilterType, label: "Tag" },
+    !filters.some(f => f.type === "date") && { type: "date" as FilterType, label: "Date" },
+    !filters.some(f => f.type === "starred") && { type: "starred" as FilterType, label: "Starred" },
+  ].filter(Boolean) as { type: FilterType; label: string }[];
 
+  const [filterSearch, setFilterSearch] = useState("");
   const valueOptions = useMemo(() => {
     if (!step || step === "type") return [] as { value: string; label: string; meta?: number; dot?: string }[];
     const active = new Set(
       filters.filter((f) => f.type === step.type).map((f) => f.value)
     );
+    const q = filterSearch.trim().toLowerCase();
     if (step.type === "tag")
       return tags
-        .map(({ tag, count }) => ({
-          value: tag,
-          label: tag,
-          meta: count,
-          dot: undefined,
-        }))
-        .filter((o) => !active.has(o.value));
+        .map(({ tag, count }) => ({ value: tag, label: tag, meta: count, dot: undefined }))
+        .filter((o) => !active.has(o.value) && (!q || o.label.toLowerCase().includes(q)));
+    if (step.type === "book")
+      return books
+        .map(({ book, count }) => ({ value: book, label: book, meta: count, dot: undefined }))
+        .filter((o) => !active.has(o.value) && (!q || o.label.toLowerCase().includes(q)));
+    if (step.type === "author")
+      return authors
+        .map(({ author, count }) => ({ value: author, label: author, meta: count, dot: undefined }))
+        .filter((o) => !active.has(o.value) && (!q || o.label.toLowerCase().includes(q)));
     return [];
-  }, [step, filters, tags]);
+  }, [step, filters, tags, books, authors, filterSearch]);
 
   const resolveLabel = (f: Filter) => {
     if (f.type === "tag") return { label: f.value, dot: undefined, typeLabel: "Tag" };
     if (f.type === "starred") return { label: "Yes", dot: undefined, typeLabel: "Starred" };
+    if (f.type === "book") return { label: f.value, dot: undefined, typeLabel: "Book" };
+    if (f.type === "author") return { label: f.value, dot: undefined, typeLabel: "Author" };
+    if (f.type === "date") return { label: f.label ?? f.value, dot: undefined, typeLabel: "Date" };
     return { label: f.value, dot: undefined, typeLabel: "" };
   };
 
@@ -3202,16 +3218,17 @@ export const FilterBar = memo(function FilterBar({
                 key={opt.type}
                 onClick={() => {
                   if (opt.type === "starred") {
-                    const alreadyHas = filters.some((f) => f.type === "starred");
-                    if (!alreadyHas) onAdd({ id: uid(), type: "starred", value: "true" });
+                    onAdd({ id: uid(), type: "starred", value: "true" });
                     setStep(null);
                   } else {
+                    setFilterSearch("");
                     setStep(opt);
                   }
                 }}
               >
                 <span style={{ fontSize: 13, color: C.secondary, display: "flex", alignItems: "center", gap: 6 }}>
                   {opt.type === "starred" && <Star size={11} />}
+                  {opt.type === "book" && <BookOpen size={11} />}
                   {opt.label}
                 </span>
               </MenuRow>
@@ -3231,7 +3248,7 @@ export const FilterBar = memo(function FilterBar({
               borderRadius: R.lg,
               boxShadow: "0 8px 28px rgba(0,0,0,0.09)",
               minWidth: 200,
-              maxHeight: 280,
+              maxHeight: 320,
               overflowY: "auto",
               animation: "fadeIn 0.12s ease",
             }}
@@ -3263,57 +3280,67 @@ export const FilterBar = memo(function FilterBar({
             >
               ← {step.label}
             </button>
-            {valueOptions.length === 0 ? (
-              <p
-                style={{
-                  padding: "12px 14px",
-                  fontSize: 13,
-                  color: C.faint,
-                  fontFamily: FONT_SANS,
-                }}
-              >
-                All values already filtered.
-              </p>
-            ) : (
-              valueOptions.map((opt) => (
-                <MenuRow
-                  key={opt.value}
-                  onClick={() => {
-                    onAdd({
-                      id: uid(),
-                      type: step.type,
-                      value: opt.value,
-                    });
+            {step.type === "date" ? (
+              <div style={{ padding: "6px 8px", display: "flex", flexDirection: "column", gap: 4 }}>
+                {([
+                  { value: "week", label: "This week" },
+                  { value: "month", label: "This month" },
+                  { value: "year", label: "This year" },
+                ] as const).map((preset) => (
+                  <MenuRow key={preset.value} onClick={() => {
+                    onAdd({ id: uid(), type: "date", value: preset.value, label: preset.label });
                     setStep(null);
-                  }}
-                >
-                  {opt.dot && (
-                    <span
+                  }}>
+                    <span style={{ fontSize: 13, color: C.secondary }}>{preset.label}</span>
+                  </MenuRow>
+                ))}
+              </div>
+            ) : (
+              <>
+                {(step.type === "book" || step.type === "author" || step.type === "tag") && valueOptions.length > 5 && (
+                  <div style={{ padding: "6px 10px", borderBottom: `1px solid ${C.border}` }}>
+                    <input
+                      autoFocus
+                      value={filterSearch}
+                      onChange={(e) => setFilterSearch(e.target.value)}
+                      placeholder={`Search ${step.label.toLowerCase()}s…`}
                       style={{
-                        width: 7,
-                        height: 7,
-                        borderRadius: "50%",
-                        background: opt.dot,
-                        flexShrink: 0,
+                        width: "100%",
+                        padding: "5px 8px",
+                        fontSize: 12,
+                        fontFamily: FONT_SANS,
+                        border: `1px solid ${C.border}`,
+                        borderRadius: R.sm,
+                        outline: "none",
+                        background: "transparent",
+                        color: C.ink,
                       }}
                     />
-                  )}
-                  <span
-                    style={{
-                      fontSize: 13,
-                      color: C.secondary,
-                      flex: 1,
-                    }}
-                  >
-                    {opt.label}
-                  </span>
-                  {opt.meta != null && (
-                    <span style={{ fontSize: 12, color: C.faint }}>
-                      {opt.meta}
-                    </span>
-                  )}
-                </MenuRow>
-              ))
+                  </div>
+                )}
+                {valueOptions.length === 0 ? (
+                  <p style={{ padding: "12px 14px", fontSize: 13, color: C.faint, fontFamily: FONT_SANS }}>
+                    {filterSearch ? "No matches." : "All values already filtered."}
+                  </p>
+                ) : (
+                  valueOptions.map((opt) => (
+                    <MenuRow
+                      key={opt.value}
+                      onClick={() => {
+                        onAdd({ id: uid(), type: step.type as FilterType, value: opt.value });
+                        setStep(null);
+                      }}
+                    >
+                      <span style={{ fontSize: 13, color: C.secondary, flex: 1 }}>
+                        {opt.label}
+                      </span>
+                      {opt.meta != null && (
+                        <span style={{ fontSize: 12, color: C.faint }}>{opt.meta}</span>
+                      )}
+                    </MenuRow>
+                  ))
+                )}
+              </>
             )}
           </div>
         )}
@@ -4840,7 +4867,7 @@ export const LibraryPanel = memo(function LibraryPanel({
   onClose: () => void;
   onRandom: () => void;
   onExport: () => void;
-  onSmartSearch?: (query: string, signal: AbortSignal) => Promise<{ type: string; text: string; cards: CardLike[] }>;
+  onSmartSearch?: (query: string, cards: CardLike[], signal: AbortSignal) => Promise<{ type: string; text: string; cards: CardLike[] }>;
   allCards?: CardLike[];
   onTriggerReview?: (book: string) => void;
 }) {
@@ -4848,13 +4875,17 @@ export const LibraryPanel = memo(function LibraryPanel({
   const mob = useContext(MobileCtx); const T = makeT(C, mob);
   const [filters, setFilters] = useState<Filter[]>([]);
   const [search, setSearch] = useState("");
-  const [smartMode, setSmartMode] = useState(false);
-  const [smartResults, setSmartResults] = useState<CardLike[] | null>(null);
-  const [smartSearching, setSmartSearching] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResults, setAiResults] = useState<CardLike[] | null>(null);
+  const [synthesis, setSynthesis] = useState<string | null>(null);
   const smartAbortRef = useRef<AbortController | null>(null);
+  const aiCacheRef = useRef<Map<string, { cards: CardLike[]; synthesis?: string }>>(new Map());
   const [viewMode, setViewMode] = useState<"book" | "all">("book");
+  const [sortMode, setSortMode] = useState<"newest" | "oldest" | "book-az" | "most-annotated">("newest");
   const [showOverflow, setShowOverflow] = useState(false);
+  const [showSort, setShowSort] = useState(false);
   const overflowRef = useRef<HTMLDivElement>(null);
+  const sortRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -4870,34 +4901,113 @@ export const LibraryPanel = memo(function LibraryPanel({
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, [showOverflow]);
-
-  // Smart search effect
   useEffect(() => {
-    if (!smartMode || !search.trim() || !onSmartSearch) {
-      setSmartResults(null);
-      setSmartSearching(false);
+    if (!showSort) return;
+    const h = (e: MouseEvent) => {
+      if (sortRef.current && !sortRef.current.contains(e.target as Node))
+        setShowSort(false);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [showSort]);
+
+  // Metadata index for smart detection
+  const metadata = useMemo(() => ({
+    books: new Set((allCards ?? cards).map(c => c.book?.toLowerCase()).filter(Boolean)),
+    authors: new Set((allCards ?? cards).map(c => c.author?.toLowerCase()).filter(Boolean)),
+    tags: new Set((allCards ?? cards).flatMap(c => (c.tags ?? []).map((t: string) => t.toLowerCase()))),
+  }), [allCards, cards]);
+
+  // Clear AI cache when cards change
+  useEffect(() => { aiCacheRef.current.clear(); }, [cards]);
+
+  // Unified smart search effect — auto-detects when to escalate to AI
+  useEffect(() => {
+    const q = search.trim();
+    if (!q || !onSmartSearch) {
+      setAiResults(null);
+      setSynthesis(null);
+      setAiLoading(false);
+      return;
+    }
+    // Check cache first
+    const cached = aiCacheRef.current.get(q);
+    if (cached) {
+      setAiResults(cached.cards);
+      setSynthesis(cached.synthesis ?? null);
+      setAiLoading(false);
+      return;
+    }
+    // Smart detection: should we escalate to AI?
+    const ql = q.toLowerCase();
+    const words = ql.split(/\s+/);
+    const exactMatch = metadata.books.has(ql) || metadata.authors.has(ql) || metadata.tags.has(ql);
+    // Count text results for detection
+    const textCount = cards.filter(c =>
+      c.quote.toLowerCase().includes(ql) || c.book.toLowerCase().includes(ql) ||
+      (c.author ?? "").toLowerCase().includes(ql) || (c.tags ?? []).some((t: string) => t.toLowerCase().includes(ql)) ||
+      (c.note ?? "").toLowerCase().includes(ql)
+    ).length;
+    const shouldAI =
+      q.length >= 3 && cards.length >= 5 && !exactMatch && (
+        (q.includes("?") || /^(what|why|how|which|show me|find)\b/.test(ql)) ||
+        /\b(connect|between|compare|relate|theme|across|pattern|similar)\b/.test(ql) ||
+        words.length >= 3 ||
+        (words.length >= 2 && textCount === 0) ||
+        (words.length >= 2 && textCount > cards.length * 0.3)
+      );
+    if (!shouldAI) {
+      setAiResults(null);
+      setSynthesis(null);
+      setAiLoading(false);
       return;
     }
     smartAbortRef.current?.abort();
     const ctrl = new AbortController();
     smartAbortRef.current = ctrl;
-    setSmartSearching(true);
+    setAiLoading(true);
     const t = setTimeout(async () => {
       try {
-        const res = await onSmartSearch(search.trim(), ctrl.signal);
+        // Pass filtered cards (after applying active filters) to AI
+        let filtered = cards;
+        for (const f of filters) {
+          if (f.type === "tag") filtered = filtered.filter(c => (c.tags ?? []).includes(f.value));
+          if (f.type === "starred") filtered = filtered.filter(c => c.starred === true);
+          if (f.type === "book") filtered = filtered.filter(c => c.book.toLowerCase() === f.value.toLowerCase());
+          if (f.type === "author") filtered = filtered.filter(c => (c.author ?? "").toLowerCase() === f.value.toLowerCase());
+          if (f.type === "date") {
+            const now = Date.now();
+            let start = 0;
+            if (f.value === "week") start = now - 7 * 86400000;
+            else if (f.value === "month") start = now - 30 * 86400000;
+            else if (f.value === "year") start = now - 365 * 86400000;
+            else if (f.value.includes("..")) {
+              const [from, to] = f.value.split("..");
+              const s = new Date(from).getTime(); const e = new Date(to).getTime();
+              filtered = filtered.filter(c => { const t = c.createdAt ?? 0; return t >= s && t <= e; });
+              continue;
+            }
+            filtered = filtered.filter(c => (c.createdAt ?? 0) >= start);
+          }
+        }
+        const res = await onSmartSearch(q, filtered, ctrl.signal);
         if (!ctrl.signal.aborted) {
-          setSmartResults(res.cards);
-          setSmartSearching(false);
+          const isSynthesis = res.type === "synthesis";
+          setAiResults(res.cards);
+          setSynthesis(isSynthesis ? res.text : null);
+          setAiLoading(false);
+          aiCacheRef.current.set(q, { cards: res.cards, synthesis: isSynthesis ? res.text : undefined });
         }
       } catch {
         if (!ctrl.signal.aborted) {
-          setSmartResults(null);
-          setSmartSearching(false);
+          setAiResults(null);
+          setSynthesis(null);
+          setAiLoading(false);
         }
       }
     }, 500);
     return () => { clearTimeout(t); ctrl.abort(); };
-  }, [smartMode, search, onSmartSearch]);
+  }, [search, onSmartSearch, cards, filters, metadata]);
 
   const tags = useMemo(
     () =>
@@ -4907,28 +5017,62 @@ export const LibraryPanel = memo(function LibraryPanel({
       })),
     [cards]
   );
+  // Compute book and author options for FilterBar
+  const bookOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const c of cards) if (c.book) counts.set(c.book, (counts.get(c.book) ?? 0) + 1);
+    return [...counts.entries()].map(([book, count]) => ({ book, count })).sort((a, b) => b.count - a.count);
+  }, [cards]);
+  const authorOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const c of cards) if (c.author) counts.set(c.author, (counts.get(c.author) ?? 0) + 1);
+    return [...counts.entries()].map(([author, count]) => ({ author, count })).sort((a, b) => b.count - a.count);
+  }, [cards]);
+
   const visible = useMemo(() => {
-    if (smartMode && smartResults) return smartResults;
+    // If AI returned results for current query, use them
+    if (aiResults && search.trim()) return aiResults;
     let r = cards;
     for (const f of filters) {
-      if (f.type === "tag")
-        r = r.filter((c) => (c.tags ?? []).includes(f.value));
-      if (f.type === "starred")
-        r = r.filter((c) => c.starred === true);
+      if (f.type === "tag") r = r.filter((c) => (c.tags ?? []).includes(f.value));
+      if (f.type === "starred") r = r.filter((c) => c.starred === true);
+      if (f.type === "book") r = r.filter((c) => c.book.toLowerCase() === f.value.toLowerCase());
+      if (f.type === "author") r = r.filter((c) => (c.author ?? "").toLowerCase() === f.value.toLowerCase());
+      if (f.type === "date") {
+        const now = Date.now();
+        let start = 0;
+        if (f.value === "week") start = now - 7 * 86400000;
+        else if (f.value === "month") start = now - 30 * 86400000;
+        else if (f.value === "year") start = now - 365 * 86400000;
+        else if (f.value.includes("..")) {
+          const [from, to] = f.value.split("..");
+          const s = new Date(from).getTime(); const e = new Date(to).getTime();
+          r = r.filter(c => { const t = c.createdAt ?? 0; return t >= s && t <= e; });
+          continue;
+        }
+        r = r.filter(c => (c.createdAt ?? 0) >= start);
+      }
     }
-    if (search.trim() && !smartMode) {
+    if (search.trim()) {
       const q = search.trim().toLowerCase();
       r = r.filter(
         (c) =>
           c.quote.toLowerCase().includes(q) ||
           c.book.toLowerCase().includes(q) ||
           (c.author ?? "").toLowerCase().includes(q) ||
-          (c.tags ?? []).some((t) => t.includes(q)) ||
+          (c.tags ?? []).some((t: string) => t.toLowerCase().includes(q)) ||
           (c.note ?? "").toLowerCase().includes(q)
       );
     }
+    // Sort
+    switch (sortMode) {
+      case "newest": r = [...r].sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0)); break;
+      case "oldest": r = [...r].sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0)); break;
+      case "book-az": r = [...r].sort((a, b) => a.book.localeCompare(b.book)); break;
+      case "most-annotated": r = [...r].sort((a, b) => ((b.tags?.length ?? 0) + (b.note ? 1 : 0)) - ((a.tags?.length ?? 0) + (a.note ? 1 : 0))); break;
+    }
     return r;
-  }, [cards, filters, search, smartMode, smartResults]);
+  }, [cards, filters, search, sortMode, aiResults]);
 
   const bookGroups = useMemo(
     () =>
@@ -4990,6 +5134,9 @@ export const LibraryPanel = memo(function LibraryPanel({
                   <span style={{ color: C.warmDot }}>
                     {" "}· {starredCount} starred
                   </span>
+                )}
+                {aiResults && search.trim() && (
+                  <span style={{ color: C.sage, fontStyle: "italic" }}> · via AI</span>
                 )}
               </span>
             </div>
@@ -5125,8 +5272,8 @@ export const LibraryPanel = memo(function LibraryPanel({
             <input
               ref={searchRef}
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={smartMode ? "Smart search…" : "Search…"}
+              onChange={(e) => { setSearch(e.target.value); setAiResults(null); setSynthesis(null); }}
+              placeholder="Search your library…"
               style={{
                 width: "100%",
                 padding: "7px 28px 7px 30px",
@@ -5144,7 +5291,7 @@ export const LibraryPanel = memo(function LibraryPanel({
             />
             {search && (
               <button
-                onClick={() => setSearch("")}
+                onClick={() => { setSearch(""); setAiResults(null); setSynthesis(null); }}
                 style={{
                   position: "absolute",
                   right: 8,
@@ -5161,26 +5308,74 @@ export const LibraryPanel = memo(function LibraryPanel({
               </button>
             )}
           </div>
-          {onSmartSearch && (
-            <button
-              onClick={() => { setSmartMode((v) => !v); setSmartResults(null); }}
-              title={smartMode ? "Switch to text search" : "Switch to AI search"}
-              style={{
-                background: smartMode ? C.surfaceAlt : "transparent",
-                border: `1px solid ${smartMode ? C.ink : C.border}`,
-                borderRadius: R.md,
-                padding: mob ? "10px 14px" : "5px 10px",
-                cursor: "pointer",
-                fontFamily: FONT_SANS,
-                fontSize: mob ? 13 : 11,
-                color: smartMode ? C.ink : C.muted,
-                flexShrink: 0,
-                fontWeight: smartMode ? 600 : 400,
-                transition: "all 0.15s",
-              }}
-            >
-              {smartSearching ? "…" : "AI"}
-            </button>
+          {viewMode === "all" && (
+            <div style={{ position: "relative", flexShrink: 0 }} ref={sortRef}>
+              <button
+                onClick={() => setShowSort(v => !v)}
+                style={{
+                  background: showSort ? C.surface : "transparent",
+                  border: `1px solid ${showSort ? C.ink : C.border}`,
+                  borderRadius: R.md,
+                  padding: mob ? "10px 14px" : "5px 10px",
+                  cursor: "pointer",
+                  fontFamily: FONT_SANS,
+                  fontSize: mob ? 13 : 11,
+                  color: showSort ? C.ink : C.muted,
+                  flexShrink: 0,
+                  transition: "all 0.15s",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                {sortMode === "newest" ? "Newest" : sortMode === "oldest" ? "Oldest" : sortMode === "book-az" ? "A-Z" : "Annotated"}
+                <ChevronDown size={10} />
+              </button>
+              {showSort && (
+                <div style={{
+                  position: "absolute",
+                  top: "calc(100% + 4px)",
+                  right: 0,
+                  background: C.base,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: R.lg,
+                  boxShadow: "0 8px 28px rgba(0,0,0,0.09)",
+                  minWidth: 150,
+                  zIndex: 10,
+                  overflow: "hidden",
+                  animation: "fadeIn 0.12s ease",
+                }}>
+                  {([
+                    { value: "newest" as const, label: "Newest first" },
+                    { value: "oldest" as const, label: "Oldest first" },
+                    { value: "book-az" as const, label: "By book (A-Z)" },
+                    { value: "most-annotated" as const, label: "Most annotated" },
+                  ]).map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => { setSortMode(opt.value); setShowSort(false); }}
+                      style={{
+                        width: "100%",
+                        textAlign: "left",
+                        padding: "9px 14px",
+                        background: sortMode === opt.value ? C.surface : "transparent",
+                        border: "none",
+                        cursor: "pointer",
+                        fontFamily: FONT_SANS,
+                        fontSize: 13,
+                        color: sortMode === opt.value ? C.ink : C.secondary,
+                        fontWeight: sortMode === opt.value ? 500 : 400,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
           <div
             style={{
@@ -5193,6 +5388,8 @@ export const LibraryPanel = memo(function LibraryPanel({
           <FilterBar
             filters={filters}
             tags={tags}
+            books={bookOptions}
+            authors={authorOptions}
             onAdd={(f) => {
               setFilters((p) => [...p, f]);
               scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
@@ -5208,33 +5405,63 @@ export const LibraryPanel = memo(function LibraryPanel({
             padding: "4px 0 100px",
           }}
         >
-          {visible.length === 0 ? (
+          {aiLoading && (
+            <div style={{ padding: "12px 14px", fontSize: 13, color: C.faint, fontFamily: FONT_SANS, fontStyle: "italic", animation: "fadeIn 0.3s ease" }}>
+              Thinking deeper…
+            </div>
+          )}
+          {synthesis && (
+            <div style={{
+              margin: "12px 0",
+              padding: "14px 16px",
+              background: C.surface,
+              borderRadius: R.lg,
+              border: `1px solid ${C.border}`,
+              position: "relative",
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                <span style={{ fontSize: 10, color: C.faint, fontFamily: FONT_SANS, textTransform: "uppercase", letterSpacing: "0.05em" }}>AI synthesis</span>
+                <button onClick={() => setSynthesis(null)} style={{ background: "none", border: "none", cursor: "pointer", color: C.faint, display: "inline-flex" }}>
+                  <X size={12} />
+                </button>
+              </div>
+              <p style={{ fontSize: 14, fontFamily: FONT_SERIF, lineHeight: 1.6, color: C.secondary, fontStyle: "italic", margin: 0 }}>
+                {synthesis}
+              </p>
+            </div>
+          )}
+          {visible.length === 0 && !aiLoading ? (
             <div style={{ textAlign: "center", padding: "80px 0" }}>
               <p style={T.small}>
-                {search
-                  ? `No results for "${search}".`
-                  : filters.length
-                    ? "No cards match these filters."
-                    : "No cards here."}
+                {search && filters.length
+                  ? `No cards match "${search}" with these filters.`
+                  : search
+                    ? aiResults !== null
+                      ? "Couldn't find cards matching that theme in your library."
+                      : `No results for "${search}".`
+                    : filters.length
+                      ? "No cards match these filters."
+                      : "No cards here."}
               </p>
               {hasFilters && (
-                <button
-                  onClick={() => {
-                    setSearch("");
-                    setFilters([]);
-                  }}
-                  style={{
-                    marginTop: 8,
-                    fontSize: 13,
-                    color: C.muted,
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    textDecoration: "underline",
-                  }}
-                >
-                  Clear all filters
-                </button>
+                <div style={{ marginTop: 8, display: "flex", gap: 12, justifyContent: "center" }}>
+                  {search && (
+                    <button
+                      onClick={() => { setSearch(""); setAiResults(null); setSynthesis(null); }}
+                      style={{ fontSize: 13, color: C.muted, background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}
+                    >
+                      Clear search
+                    </button>
+                  )}
+                  {filters.length > 0 && (
+                    <button
+                      onClick={() => setFilters([])}
+                      style={{ fontSize: 13, color: C.muted, background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}
+                    >
+                      Clear filters
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           ) : viewMode === "book" ? (
@@ -5301,7 +5528,7 @@ export const LibraryPanel = memo(function LibraryPanel({
             ))
           ) : (
             <div style={{ paddingTop: 12 }}>
-              {[...visible].sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0)).map((c, i) => (
+              {visible.map((c, i) => (
                 <div key={c.id} className="nc-card-enter" style={{ "--i": i } as React.CSSProperties}>
                   <NoteCard card={c} {...cardProps} />
                 </div>

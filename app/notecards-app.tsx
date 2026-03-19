@@ -1600,7 +1600,7 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
                 onClose={() => setActiveTab("home")}
                 onRandom={openRandom}
                 onExport={() => setShowExport(true)}
-                onSmartSearch={(query, signal) => intelligentFind(query, cards, undefined, signal)}
+                onSmartSearch={(query, filteredCards, signal) => intelligentFind(query, filteredCards, undefined, signal)}
                 onTriggerReview={triggerBookReview}
               />
             </>
