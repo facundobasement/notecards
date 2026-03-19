@@ -4254,6 +4254,252 @@ export function MilestoneCard({ totalQuotes, totalBooks, onDismiss }: {
   );
 }
 
+// ─── BookReviewNudge ─────────────────────────────────────────────────────────
+export function BookReviewNudge({ book, count, onReview, onDismiss }: {
+  book: string;
+  count: number;
+  onReview: () => void;
+  onDismiss: () => void;
+}) {
+  const C = useC();
+  const mob = useContext(MobileCtx);
+  return (
+    <div style={{
+      padding: mob ? "14px 0" : "18px 0",
+      animation: "fadeIn 0.5s ease both",
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+      flexWrap: "wrap",
+    }}>
+      <p style={{
+        fontSize: mob ? 13 : 14,
+        color: C.muted,
+        fontFamily: FONT_SANS,
+        lineHeight: 1.5,
+        flex: 1,
+        minWidth: 200,
+      }}>
+        You saved {count} quotes from{" "}
+        <span style={{ fontFamily: FONT_SERIF, fontStyle: "italic", color: C.ink }}>{book}</span>
+        . What did it teach you?
+      </p>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <button
+          onClick={onReview}
+          style={{
+            fontSize: 13,
+            fontFamily: FONT_SANS,
+            fontWeight: 500,
+            color: C.sage,
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            padding: "4px 0",
+          }}
+        >
+          Review this book →
+        </button>
+        <button
+          onClick={onDismiss}
+          style={{
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            color: C.faint,
+            padding: "4px 8px",
+            display: "flex",
+            alignItems: "center",
+          }}
+        >
+          <X size={13} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── BookReviewCard ──────────────────────────────────────────────────────────
+export function BookReviewCard({ book, author, review, allCards, onDismiss }: {
+  book: string;
+  author: string;
+  review: {
+    overview: string;
+    themes: { name: string; insight: string; quoteIds: string[] }[];
+    takeaway: string;
+    question: string;
+  };
+  allCards: CardLike[];
+  onDismiss: () => void;
+}) {
+  const C = useC();
+  const mob = useContext(MobileCtx);
+  const [expanded, setExpanded] = useState<Set<number>>(() => new Set([0]));
+
+  const toggleTheme = (i: number) => {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(i)) next.delete(i); else next.add(i);
+      return next;
+    });
+  };
+
+  const resolveQuote = (id: string) => allCards.find(c => c.id === id);
+
+  return (
+    <div style={{
+      maxWidth: 520,
+      margin: "0 auto",
+      padding: mob ? "24px 0" : "36px 0",
+      animation: "fadeIn 0.6s ease both",
+    }}>
+      {/* Header */}
+      <div style={{ width: 24, height: 1, background: C.border, margin: "0 auto 20px" }} />
+      <p style={{
+        fontFamily: FONT_SERIF,
+        fontSize: mob ? 18 : 22,
+        fontStyle: "italic",
+        color: C.ink,
+        textAlign: "center",
+        marginBottom: 20,
+        lineHeight: 1.4,
+      }}>
+        What <em>{book}</em> taught you
+      </p>
+
+      {/* Overview */}
+      <p style={{
+        fontSize: mob ? 13 : 14,
+        fontFamily: FONT_SANS,
+        color: C.muted,
+        lineHeight: 1.75,
+        marginBottom: 24,
+      }}>
+        {review.overview}
+      </p>
+
+      {/* Themes */}
+      {review.themes.map((theme, i) => (
+        <div key={i} style={{ marginBottom: 16 }}>
+          <button
+            onClick={() => toggleTheme(i)}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "6px 0",
+              width: "100%",
+              textAlign: "left",
+            }}
+          >
+            <span style={{
+              fontSize: 11,
+              color: C.faint,
+              transition: "transform 0.2s",
+              transform: expanded.has(i) ? "rotate(90deg)" : "rotate(0deg)",
+              display: "inline-block",
+            }}>
+              ▸
+            </span>
+            <span style={{
+              fontFamily: FONT_SANS,
+              fontSize: mob ? 13 : 14,
+              fontWeight: 600,
+              color: C.secondary,
+            }}>
+              {theme.name}
+            </span>
+          </button>
+          {expanded.has(i) && (
+            <div style={{
+              paddingLeft: 20,
+              animation: "fadeIn 0.3s ease both",
+            }}>
+              <p style={{
+                fontSize: 13,
+                fontFamily: FONT_SANS,
+                color: C.muted,
+                lineHeight: 1.65,
+                marginBottom: 8,
+              }}>
+                {theme.insight}
+              </p>
+              {theme.quoteIds.map(id => {
+                const card = resolveQuote(id);
+                if (!card) return null;
+                return (
+                  <p key={id} style={{
+                    fontSize: 12,
+                    fontFamily: FONT_SERIF,
+                    fontStyle: "italic",
+                    color: C.faint,
+                    lineHeight: 1.6,
+                    paddingLeft: 12,
+                    borderLeft: `1px solid ${C.border}`,
+                    marginBottom: 6,
+                  }}>
+                    "{card.quote.length > 120 ? card.quote.slice(0, 120) + "..." : card.quote}"
+                    {card.location && <span style={{ fontFamily: FONT_SANS, fontStyle: "normal" }}> — {card.location}</span>}
+                  </p>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ))}
+
+      {/* Key takeaway */}
+      <div style={{ width: 24, height: 1, background: C.border, margin: "20px auto" }} />
+      <p style={{
+        fontFamily: FONT_SERIF,
+        fontSize: mob ? 15 : 17,
+        color: C.ink,
+        textAlign: "center",
+        lineHeight: 1.6,
+        fontStyle: "italic",
+        marginBottom: 4,
+      }}>
+        {review.takeaway}
+      </p>
+
+      {/* Reflection question */}
+      <div style={{ width: 24, height: 1, background: C.border, margin: "20px auto" }} />
+      <p style={{
+        fontFamily: FONT_SERIF,
+        fontSize: mob ? 13 : 14,
+        fontStyle: "italic",
+        color: C.muted,
+        textAlign: "center",
+        lineHeight: 1.6,
+        marginBottom: 24,
+      }}>
+        {review.question}
+      </p>
+
+      {/* Dismiss */}
+      <div style={{ textAlign: "center" }}>
+        <button
+          onClick={onDismiss}
+          style={{
+            fontSize: 12,
+            fontFamily: FONT_SANS,
+            color: C.faint,
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            padding: "4px 12px",
+          }}
+        >
+          Dismiss
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── MorningCard ──────────────────────────────────────────────────────────────
 export const MorningCard = memo(function MorningCard({
   cards,
@@ -4587,6 +4833,7 @@ export const LibraryPanel = memo(function LibraryPanel({
   onSmartSearch,
   allCards,
   inputContainerRef,
+  onTriggerReview,
 }: Omit<NoteCardProps, "card"> & {
   cards: CardLike[];
   onClose: () => void;
@@ -4594,6 +4841,7 @@ export const LibraryPanel = memo(function LibraryPanel({
   onExport: () => void;
   onSmartSearch?: (query: string, signal: AbortSignal) => Promise<{ type: string; text: string; cards: CardLike[] }>;
   allCards?: CardLike[];
+  onTriggerReview?: (book: string) => void;
 }) {
   const C = useC();
   const mob = useContext(MobileCtx); const T = makeT(C, mob);
@@ -5025,6 +5273,23 @@ export const LibraryPanel = memo(function LibraryPanel({
                   }}>
                     {groupCards.length}
                   </span>
+                  {onTriggerReview && groupCards.length >= 3 && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onTriggerReview(heading); }}
+                      style={{
+                        fontSize: 11,
+                        fontFamily: FONT_SANS,
+                        color: C.sage,
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        padding: "2px 6px",
+                        marginLeft: 4,
+                      }}
+                    >
+                      Review
+                    </button>
+                  )}
                 </div>
                 {groupCards.map((c, i) => (
                   <div key={c.id} className="nc-card-enter" style={{ "--i": i } as React.CSSProperties}>
@@ -5571,6 +5836,15 @@ export const MsgBubble = function MsgBubble({
           quotes={m.quotes}
           onImport={(quotes) => onImportConfirm(m.id, quotes)}
           onDiscard={() => onImportDiscard(m.id)}
+        />
+      )}
+      {m.type === "book_review" && (m as any).review && (
+        <BookReviewCard
+          book={(m as any).book}
+          author={(m as any).author}
+          review={(m as any).review}
+          allCards={allCards}
+          onDismiss={() => {}}
         />
       )}
       {m.type === "divider" && m.label && (
