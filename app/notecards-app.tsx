@@ -40,6 +40,8 @@ import {
   CurrentlyReading,
   ReflectionNudge,
   MilestoneCard,
+  BookReviewNudge,
+  BookReviewCard,
   AccountPanel,
   type UserMeta,
 } from "./notecards-components";
@@ -405,6 +407,37 @@ async function detectBookFromQuote(
   return { book: p.book, author: p.author || "", year: p.year ?? null };
 }
 
+async function generateBookReview(
+  book: string,
+  author: string,
+  bookCards: { id: string; quote: string; book: string; author?: string; year?: number | null; tags?: string[]; note?: string; location?: string }[],
+  signal: AbortSignal,
+): Promise<{
+  overview: string;
+  themes: { name: string; insight: string; quoteIds: string[] }[];
+  takeaway: string;
+  question: string;
+} | null> {
+  const quotes = bookCards.map((c, i) => `[${c.id}] "${c.quote}"${c.location ? ` (${c.location})` : ""}${c.tags?.length ? ` — ${c.tags.join(", ")}` : ""}`).join("\n");
+  const raw = await callClaude(
+    [{
+      role: "user",
+      content: `Here are ${bookCards.length} quotes I saved from *${book}*${author ? ` by ${author}` : ""}:\n\n${quotes}\n\nSynthesize what I found meaningful in this book.\n\nJSON: {"overview":"<2-3 sentences on what the reader was drawn to>","themes":[{"name":"<theme>","insight":"<1-2 sentences>","quoteIds":["<id1>","<id2>"]}],"takeaway":"<the single most important idea, one sentence>","question":"<a reflective question for the reader to sit with>"}`,
+    }],
+    "You are a thoughtful reading companion. Synthesize what the reader found meaningful — not a book summary, but a reflection on THEIR selections. Return ONLY JSON, no markdown.",
+    signal,
+    false,
+    1500,
+  );
+  try {
+    const p = await parseJSON(raw);
+    if (!p?.overview || !p?.themes) return null;
+    return { overview: p.overview, themes: p.themes, takeaway: p.takeaway, question: p.question };
+  } catch {
+    return null;
+  }
+}
+
 async function parseImportChunk(text: string, signal: AbortSignal) {
   const prompt = `Parse the following text and extract book quotes.\n\nText:\n${text}\n\nJSON: {"quotes":[{"quote":"<exact quote text>","book":"<book title>","author":"<author name or empty>","year":<year number or null>,"tags":["<tag1>","<tag2>"]}]}\n\nRules:\n- Extract as many distinct quotes as possible\n- Generate 2-4 relevant lowercase tags per quote\n- Return empty array if no quotes found`;
   const raw = await callClaude(
@@ -524,6 +557,11 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
   const [undoToast, setUndoToast] = useState<{ card: any; timer: ReturnType<typeof setTimeout> } | null>(null);
   const [milestone, setMilestone] = useState<{ quotes: number; books: number } | null>(null);
   const [nudgeDismissed, setNudgeDismissed] = useState(false);
+  const [bookReview, setBookReview] = useState<{
+    book: string; author: string;
+    review: { overview: string; themes: { name: string; insight: string; quoteIds: string[] }[]; takeaway: string; question: string };
+  } | null>(null);
+  const [reviewDismissed, setReviewDismissed] = useState(false);
 
   const C = dark ? DARK : LIGHT;
 
@@ -567,6 +605,60 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
     if (typeof window !== "undefined" && localStorage.getItem(key)) return null;
     return { ...best, dismissKey: key };
   }, [cards, nudgeDismissed]);
+
+  const bookReviewNudge = useMemo(() => {
+    if (reviewDismissed) return null;
+    const threeWeeksAgo = Date.now() - 21 * 86400000;
+    const month = new Date().toISOString().slice(0, 7);
+    const bookMap = new Map<string, { author: string; count: number; latest: number }>();
+    for (const c of cards) {
+      const t = c.createdAt ?? 0;
+      const prev = bookMap.get(c.book);
+      bookMap.set(c.book, {
+        author: c.author ?? prev?.author ?? "",
+        count: (prev?.count ?? 0) + 1,
+        latest: Math.max(prev?.latest ?? 0, t),
+      });
+    }
+    let best: { book: string; author: string; count: number } | null = null;
+    for (const [book, { author, count, latest }] of bookMap) {
+      if (count < 3) continue;
+      if (latest > threeWeeksAgo) continue; // still actively reading
+      const k = book.replace(/\s+/g, "_");
+      if (typeof window !== "undefined" && localStorage.getItem(`nc_review_${k}`)) continue;
+      if (typeof window !== "undefined" && localStorage.getItem(`nc_review_dismiss_${k}_${month}`)) continue;
+      if (!best || count > best.count) best = { book, author, count };
+    }
+    return best;
+  }, [cards, reviewDismissed]);
+
+  const triggerBookReview = useCallback(async (book: string) => {
+    const bookCards = cards.filter(c => c.book === book);
+    const author = bookCards[0]?.author ?? "";
+    const loadingMsg = mkMsg("assistant", { type: "text", text: `Reviewing *${book}*...` });
+    setMessages(prev => [...prev, loadingMsg]);
+    const abortCtrl = new AbortController();
+    try {
+      const review = await generateBookReview(book, author, bookCards, abortCtrl.signal);
+      if (review) {
+        setBookReview({ book, author, review });
+        setMessages(prev => prev.map(m =>
+          m.id === loadingMsg.id
+            ? { ...mkMsg("assistant", { type: "book_review" }), book, author, review } as any
+            : m
+        ));
+        localStorage.setItem(`nc_review_${book.replace(/\s+/g, "_")}`, "1");
+      } else {
+        setMessages(prev => prev.map(m =>
+          m.id === loadingMsg.id
+            ? mkMsg("assistant", { type: "text", text: `I couldn't generate a review for *${book}* right now. Try again later.` })
+            : m
+        ));
+      }
+    } catch {
+      setMessages(prev => prev.filter(m => m.id !== loadingMsg.id));
+    }
+  }, [cards]);
 
   const showHint = useCallback((key: string) => {
     if (typeof window === "undefined") return;
@@ -1490,6 +1582,7 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
                 onRandom={openRandom}
                 onExport={() => setShowExport(true)}
                 onSmartSearch={(query, signal) => intelligentFind(query, cards, undefined, signal)}
+                onTriggerReview={triggerBookReview}
               />
             </>
           ) : (
@@ -1546,6 +1639,18 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
                       setTimeout(() => handleSend(), 100);
                     }}
                     onDismiss={dismissNudge}
+                  />
+                )}
+                {bookReviewNudge && !bookReview && (
+                  <BookReviewNudge
+                    book={bookReviewNudge.book}
+                    count={bookReviewNudge.count}
+                    onReview={() => triggerBookReview(bookReviewNudge.book)}
+                    onDismiss={() => {
+                      const month = new Date().toISOString().slice(0, 7);
+                      localStorage.setItem(`nc_review_dismiss_${bookReviewNudge.book.replace(/\s+/g, "_")}_${month}`, "1");
+                      setReviewDismissed(true);
+                    }}
                   />
                 )}
                 {messages.map((m) =>
