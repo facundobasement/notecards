@@ -793,31 +793,36 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
     [userId]
   );
   const deleteCard = useCallback(
-    (id: string) => {
+    async (id: string) => {
       const card = cards.find((c) => c.id === id);
       if (!card) return;
       dispatch({ type: "DELETE", id });
-      // Cancel any pending undo toast
+      // Delete from Supabase immediately (no deferred timeout)
+      const { error } = await supabase
+        .from("notecards")
+        .delete()
+        .eq("id", id)
+        .eq("user_id", userId);
+      if (error) console.error("Supabase delete error:", error);
+      // Show undo toast — undo will re-insert
       if (undoToast) clearTimeout(undoToast.timer);
-      const timer = setTimeout(async () => {
-        setUndoToast(null);
-        const { error } = await supabase
-          .from("notecards")
-          .delete()
-          .eq("id", id)
-          .eq("user_id", userId);
-        if (error) console.error("Supabase delete error:", error);
-      }, 8000);
+      const timer = setTimeout(() => setUndoToast(null), 8000);
       setUndoToast({ card, timer });
     },
     [userId, cards, undoToast]
   );
-  const undoDelete = useCallback(() => {
+  const undoDelete = useCallback(async () => {
     if (!undoToast) return;
     clearTimeout(undoToast.timer);
     dispatch({ type: "ADD", card: undoToast.card });
     setUndoToast(null);
-  }, [undoToast]);
+    // Re-insert into Supabase
+    const { id, ...rest } = undoToast.card;
+    const { error } = await supabase
+      .from("notecards")
+      .insert({ ...rest, id, user_id: userId });
+    if (error) console.error("Supabase undo-delete error:", error);
+  }, [undoToast, userId]);
 
   const markCardSeen = useCallback(
     (id: string) => {
