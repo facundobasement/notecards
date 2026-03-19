@@ -4953,20 +4953,9 @@ export const LibraryPanel = memo(function LibraryPanel({
     const ql = q.toLowerCase();
     const words = ql.split(/\s+/);
     const exactMatch = metadata.books.has(ql) || metadata.authors.has(ql) || metadata.tags.has(ql);
-    // Count text results for detection
-    const textCount = cards.filter(c =>
-      c.quote.toLowerCase().includes(ql) || c.book.toLowerCase().includes(ql) ||
-      (c.author ?? "").toLowerCase().includes(ql) || (c.tags ?? []).some((t: string) => t.toLowerCase().includes(ql)) ||
-      (c.note ?? "").toLowerCase().includes(ql)
-    ).length;
-    const shouldAI =
-      q.length >= 3 && cards.length >= 5 && !exactMatch && (
-        (q.includes("?") || /^(what|why|how|which|show me|find)\b/.test(ql)) ||
-        /\b(connect|between|compare|relate|theme|across|pattern|similar)\b/.test(ql) ||
-        words.length >= 3 ||
-        (words.length >= 2 && textCount === 0) ||
-        (words.length >= 2 && textCount > cards.length * 0.3)
-      );
+    const shouldAI = cards.length >= 3 && !exactMatch && (
+      q.includes("?") || words.length >= 2
+    );
     if (!shouldAI) {
       setAiResults(null);
       setSynthesis(null);
@@ -5284,7 +5273,7 @@ export const LibraryPanel = memo(function LibraryPanel({
               ref={searchRef}
               value={search}
               onChange={(e) => { setSearch(e.target.value); setAiResults(null); setSynthesis(null); }}
-              placeholder="Search your library…"
+              placeholder="Search by keyword, topic, or question…"
               style={{
                 width: "100%",
                 padding: mob ? "9px 28px 9px 30px" : "7px 28px 7px 30px",
@@ -5412,13 +5401,16 @@ export const LibraryPanel = memo(function LibraryPanel({
       </div>
       <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
         <div
+          key={aiResults ? "ai" : "text"}
           style={{
             padding: "4px 0 100px",
+            animation: "fadeIn 0.15s ease",
           }}
         >
           {aiLoading && (
-            <div style={{ padding: "12px 14px", fontSize: 13, color: C.faint, fontFamily: FONT_SANS, fontStyle: "italic", animation: "fadeIn 0.3s ease" }}>
-              Thinking deeper…
+            <div style={{ padding: "8px 14px", fontSize: 12, color: C.sage, fontFamily: FONT_SANS, fontStyle: "italic", display: "flex", alignItems: "center", gap: 6, animation: "fadeIn 0.3s ease" }}>
+              <span style={{ width: 4, height: 4, borderRadius: "50%", background: C.sage, animation: "pulse 1.2s ease-in-out infinite" }} />
+              Also searching by meaning…
             </div>
           )}
           {synthesis && (
