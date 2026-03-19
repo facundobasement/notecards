@@ -523,6 +523,7 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
   const isMobile = useIsMobile();
   const [cards, dispatch] = useReducer(cardsReducer, []);
   const [dark, setDark] = useState(false);
+  const [digestOptout, setDigestOptout] = useState(false);
   const [storageLoaded, setStorageLoaded] = useState(false);
   const [cardsLoading, setCardsLoading] = useState(true);
 
@@ -745,6 +746,11 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
   useEffect(() => {
     if (activeTab === "library" && cards.length > 0) showHint("nc_hint_library");
   }, [activeTab, cards.length, showHint]);
+
+  // Init digest optout from user metadata
+  useEffect(() => {
+    if (userMeta?.digestOptout) setDigestOptout(true);
+  }, [userMeta?.digestOptout]);
 
   // Persist dark mode to localStorage when storageLoaded
   useEffect(() => {
@@ -1428,6 +1434,12 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
     await supabase.auth.updateUser({ data: { full_name: name } });
   }, []);
 
+  const handleToggleDigest = useCallback(async () => {
+    const next = !digestOptout;
+    setDigestOptout(next);
+    await supabase.auth.updateUser({ data: { digest_optout: next } });
+  }, [digestOptout]);
+
   const showEmpty = !cardsLoading && cards.length === 0 && messages.length === 0;
   const hasInput = input.trim().length > 0;
   const msgCardProps = useMemo(() => ({
@@ -1565,6 +1577,8 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
               onSignOut={onSignOut ?? (() => {})}
               onDeleteAccount={handleDeleteAccount}
               onUpdateName={handleUpdateName}
+              digestOptout={digestOptout}
+              onToggleDigest={handleToggleDigest}
             />
           ) : activeTab === "library" && !showEmpty && !cardsLoading ? (
             <>

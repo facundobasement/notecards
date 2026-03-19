@@ -28,6 +28,7 @@ export default function AppPage() {
             name: user.user_metadata?.full_name ?? "",
             email: user.email ?? "",
             avatar: user.user_metadata?.avatar_url ?? "",
+            digestOptout: user.user_metadata?.digest_optout ?? false,
           });
         }
       })
