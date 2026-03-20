@@ -43,6 +43,10 @@ import {
   BookReviewNudge,
   BookReviewCard,
   AccountPanel,
+  FeatureUnlockCard,
+  isFeatureLocked,
+  FEATURE_TIERS,
+  getNewlyUnlocked,
   type UserMeta,
 } from "./notecards-components";
 
@@ -1065,9 +1069,19 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
           setMilestone({ quotes: newTotal, books: newBooks });
         }
       }
-      setMessages((p) =>
-        p.map((m) => (m.id === pid ? { ...m, type: "saved", card, liveCard: card } : m))
-      );
+      // Check feature unlocks
+      const prevCount = cardsRef.current.length;
+      const unlocked = getNewlyUnlocked(prevCount, prevCount + 1);
+      const unlockMsgs = unlocked
+        .filter((f) => !localStorage.getItem(`nc_unlock_${f.cmd.replace("/", "")}`))
+        .map((f) => {
+          localStorage.setItem(`nc_unlock_${f.cmd.replace("/", "")}`, "1");
+          return mkMsg("assistant", { type: "feature-unlock", feature: f });
+        });
+      setMessages((p) => [
+        ...p.map((m) => (m.id === pid ? { ...m, type: "saved", card, liveCard: card } : m)),
+        ...unlockMsgs,
+      ]);
       setAddCtx(null);
       setTagDrawer(null);
     },
@@ -1118,6 +1132,18 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
         setMilestone({ quotes: newTotal, books: newBooks });
       }
     }
+    // Check feature unlocks (newTotal may be stale via ref, so use +1 pattern)
+    const prevQCount = newTotal - 1;
+    const quickUnlocked = getNewlyUnlocked(prevQCount, prevQCount + 1);
+    const quickUnlockMsgs = quickUnlocked
+      .filter((f) => !localStorage.getItem(`nc_unlock_${f.cmd.replace("/", "")}`))
+      .map((f) => {
+        localStorage.setItem(`nc_unlock_${f.cmd.replace("/", "")}`, "1");
+        return mkMsg("assistant", { type: "feature-unlock", feature: f });
+      });
+    if (quickUnlockMsgs.length) {
+      setMessages(p => [...p, ...quickUnlockMsgs]);
+    }
 
     // Silent tag generation in background
     try {
@@ -1160,18 +1186,28 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
       createdAt: NOW(),
       lastSeenAt: NOW(),
     }));
+    const prevImportCount = cardsRef.current.length;
     for (const card of newCards) {
       dispatch({ type: "ADD", card });
       const { error } = await supabase.from("notecards").insert(cardToRow(card, userId));
       if (error) console.error("Supabase insert error:", error);
     }
-    setMessages((p) =>
-      p.map((m) =>
+    // Check feature unlocks for bulk import
+    const importUnlocked = getNewlyUnlocked(prevImportCount, prevImportCount + newCards.length);
+    const importUnlockMsgs = importUnlocked
+      .filter((f) => !localStorage.getItem(`nc_unlock_${f.cmd.replace("/", "")}`))
+      .map((f) => {
+        localStorage.setItem(`nc_unlock_${f.cmd.replace("/", "")}`, "1");
+        return mkMsg("assistant", { type: "feature-unlock", feature: f });
+      });
+    setMessages((p) => [
+      ...p.map((m) =>
         m.id === pid
           ? { ...m, type: "text", text: `Imported ${newCards.length} card${newCards.length !== 1 ? "s" : ""} into your library.` }
           : m
-      )
-    );
+      ),
+      ...importUnlockMsgs,
+    ]);
     setFlowStage(null);
   }, [userId]);
 
@@ -1241,6 +1277,22 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
     setShowCmdPalette(false);
     const sc = cards;
     const cmd = raw.toLowerCase();
+
+    // ─── Feature lock gate ────────────────────────────────────────────────
+    const cmdName = cmd.split(" ")[0];
+    if (isFeatureLocked(cmdName, cards.length)) {
+      const tier = FEATURE_TIERS.find((t) => t.cmd === cmdName);
+      const remaining = tier ? tier.threshold - cards.length : 0;
+      setMessages((p) => [
+        ...p,
+        mkMsg("user", { type: "text", text: raw }),
+        mkMsg("assistant", {
+          type: "text",
+          text: `*${remaining} more quote${remaining === 1 ? "" : "s"}* to unlock **${cmdName}**. Keep building your library.`,
+        }),
+      ]);
+      return;
+    }
 
     if (raw === "/library") {
       setActiveTab("library");
@@ -1674,7 +1726,11 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
                   />
                 )}
                 {messages.map((m) =>
-                  (m as any).type === "tagpicker_placeholder" ? null : (
+                  (m as any).type === "tagpicker_placeholder" ? null : (m as any).type === "feature-unlock" ? (
+                    <div key={m.id} style={{ animation: "fadeIn 0.25s ease", marginBottom: 36 }}>
+                      <FeatureUnlockCard feature={(m as any).feature as any} />
+                    </div>
+                  ) : (
                     <div key={m.id} style={{ animation: "fadeIn 0.25s ease", marginBottom: 36 }}>
                       <MsgBubble
                         m={m as any}
@@ -1794,6 +1850,7 @@ export default function NotecardsApp({ userId, userMeta, onSignOut }: NotecardsA
               {showCmdPalette && (
                 <CommandPalette
                   query={cmdQuery}
+                  cardCount={cards.length}
                   onSelect={(cmd) => {
                     setInput(cmd + " ");
                     setShowCmdPalette(false);
