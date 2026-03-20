@@ -4132,22 +4132,58 @@ export function ContextualHint({
   );
 }
 
+// ─── CompanionLetter ─────────────────────────────────────────────────────────
+function CompanionLetter({ children }: { children: React.ReactNode }) {
+  const C = useC();
+  const mob = useContext(MobileCtx);
+  const isDark = C.base === DARK.base;
+  return (
+    <div style={{
+      display: "flex",
+      justifyContent: "center",
+      padding: mob ? "20px 12px" : "28px 16px",
+      animation: "fadeIn 0.6s ease both",
+    }}>
+      <div style={{
+        maxWidth: 440,
+        width: "100%",
+        background: isDark
+          ? "linear-gradient(180deg, #1e1d1a 0%, #1a1916 100%)"
+          : "linear-gradient(180deg, #faf9f6 0%, #f6f4f0 100%)",
+        border: `1px solid ${isDark ? "#2a2925" : "#e8e6e1"}`,
+        borderRadius: 10,
+        padding: mob ? "28px 24px" : "36px 32px",
+        textAlign: "center" as const,
+      }}>
+        {children}
+        <p style={{
+          fontSize: 10,
+          color: C.faint,
+          textAlign: "center",
+          fontFamily: FONT_SANS,
+          letterSpacing: "0.06em",
+          textTransform: "uppercase" as const,
+          margin: "14px 0 0",
+        }}>
+          from your companion
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // ─── SeedCard ────────────────────────────────────────────────────────────────
 export function SeedCard() {
   const C = useC();
   const mob = useContext(MobileCtx);
   return (
-    <div style={{
-      padding: mob ? "16px 0" : "20px 0",
-      opacity: 0.6,
-      animation: "fadeIn 0.5s ease both",
-    }}>
+    <CompanionLetter>
       <div style={{ width: 20, height: 1, background: C.border, margin: "0 auto 16px" }} />
       <p style={{
         fontFamily: FONT_SERIF,
         fontStyle: "italic",
-        fontSize: mob ? 15 : 17,
-        lineHeight: 1.7,
+        fontSize: mob ? 16 : 19,
+        lineHeight: 1.75,
         color: C.ink,
         textAlign: "center",
         maxWidth: 380,
@@ -4155,28 +4191,17 @@ export function SeedCard() {
       }}>
         &ldquo;A book must be the axe for the frozen sea within us.&rdquo;
       </p>
+      <div style={{ width: 20, height: 1, background: C.border, margin: "12px auto 14px" }} />
       <p style={{
-        fontSize: 11,
-        color: C.faint,
+        fontSize: 12,
+        color: C.muted,
         textAlign: "center",
         fontFamily: FONT_SANS,
-        margin: "0 auto 4px",
+        margin: "0 auto",
       }}>
         Franz Kafka &middot; <em>Letters to Friends</em>
       </p>
-      <p style={{
-        fontSize: 10,
-        color: C.faint,
-        textAlign: "center",
-        fontFamily: FONT_SANS,
-        letterSpacing: "0.05em",
-        textTransform: "uppercase" as const,
-        margin: "4px auto 0",
-      }}>
-        from your companion
-      </p>
-      <div style={{ width: 20, height: 1, background: C.border, margin: "16px auto 0" }} />
-    </div>
+    </CompanionLetter>
   );
 }
 
@@ -4719,13 +4744,15 @@ export const MorningCard = memo(function MorningCard({
 
   if (!card) return null;
 
+  const isDark = C.base === DARK.base;
+
   return (
     <div
       style={{
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: mob ? "32px 0 24px" : "48px 0 32px",
+        padding: mob ? "32px 12px 24px" : "48px 16px 32px",
         fontFamily: FONT_SANS,
         opacity: visible ? 1 : 0,
         transition: "opacity 0.6s ease",
@@ -4733,13 +4760,19 @@ export const MorningCard = memo(function MorningCard({
     >
       <div
         style={{
-          maxWidth: 560,
+          maxWidth: 440,
           width: "100%",
+          background: isDark
+            ? "linear-gradient(180deg, #1e1d1a 0%, #1a1916 100%)"
+            : "linear-gradient(180deg, #faf9f6 0%, #f6f4f0 100%)",
+          border: `1px solid ${isDark ? "#2a2925" : "#e8e6e1"}`,
+          borderRadius: 10,
+          padding: mob ? "28px 24px" : "36px 32px",
           opacity: visible ? 1 : 0,
           transform: visible ? "scale(1) translateY(0)" : "scale(0.97) translateY(12px)",
           transition: "opacity 0.8s ease 0.15s, transform 0.8s ease 0.15s",
           display: "flex",
-          flexDirection: "column",
+          flexDirection: "column" as const,
           alignItems: "center",
         }}
       >
@@ -4757,30 +4790,31 @@ export const MorningCard = memo(function MorningCard({
           </p>
         )}
         {/* Thin rule */}
-        <div style={{ width: 32, height: 1, background: C.border, marginBottom: mob ? 28 : 48 }} />
+        <div style={{ width: 20, height: 1, background: C.border, marginBottom: mob ? 20 : 28 }} />
 
         {/* Quote */}
         <p
           style={{
             fontFamily: FONT_SERIF,
-            fontSize: 24,
-            lineHeight: 1.65,
+            fontStyle: "italic",
+            fontSize: mob ? 19 : 22,
+            lineHeight: 1.75,
             color: C.ink,
             textAlign: "center",
             fontWeight: 400,
             letterSpacing: "-0.01em",
-            marginBottom: 40,
-            maxWidth: 500,
+            marginBottom: 28,
+            maxWidth: 380,
           }}
         >
           {card.quote}
         </p>
 
         {/* Rule */}
-        <div style={{ width: 24, height: 1, background: C.border, marginBottom: 28 }} />
+        <div style={{ width: 20, height: 1, background: C.border, marginBottom: 20 }} />
 
         {/* Book + author */}
-        <div style={{ textAlign: "center", marginBottom: 20 }}>
+        <div style={{ textAlign: "center", marginBottom: 16 }}>
           <p style={{ ...T.book, fontSize: 12, marginBottom: 5 }}>{card.book}</p>
           {card.author && (
             <p style={{ ...T.author, fontSize: 13 }}>
@@ -4796,7 +4830,7 @@ export const MorningCard = memo(function MorningCard({
             color: C.faint,
             fontFamily: FONT_SANS,
             fontStyle: "italic",
-            marginBottom: 20,
+            marginBottom: 16,
             textAlign: "center",
           }}>
             {timeAgo(card.createdAt)}
@@ -4805,7 +4839,7 @@ export const MorningCard = memo(function MorningCard({
 
         {/* Annotation with evolving reflections */}
         {card.note && (
-          <div style={{ maxWidth: 420, width: "100%", marginBottom: 12 }}>
+          <div style={{ maxWidth: 360, width: "100%", marginBottom: 12 }}>
             <p
               style={{
                 fontSize: 11,
@@ -4841,7 +4875,7 @@ export const MorningCard = memo(function MorningCard({
           <button
             onClick={() => setShowReflectM(true)}
             style={{
-              marginBottom: 20,
+              marginBottom: 16,
               fontSize: 13,
               color: C.faint,
               background: "none",
@@ -4857,7 +4891,7 @@ export const MorningCard = memo(function MorningCard({
           </button>
         )}
         {showReflectM && (
-          <div style={{ maxWidth: 420, width: "100%", marginBottom: 20 }}>
+          <div style={{ maxWidth: 360, width: "100%", marginBottom: 16 }}>
             <textarea
               autoFocus
               value={newThoughtM}
@@ -4903,7 +4937,7 @@ export const MorningCard = memo(function MorningCard({
 
         {/* Tags */}
         {(card.tags ?? []).length > 0 && (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginBottom: 32 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginBottom: 24 }}>
             {(card.tags ?? []).map((t) => (
               <Tag key={t}>{t}</Tag>
             ))}
@@ -4911,7 +4945,7 @@ export const MorningCard = memo(function MorningCard({
         )}
 
         {/* Actions */}
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12 }}>
           <button
             type="button"
             onClick={() => onUpdate(card.id, { starred: !card.starred })}
@@ -4972,6 +5006,19 @@ export const MorningCard = memo(function MorningCard({
             <Share2 size={14} /> Share
           </button>
         </div>
+
+        {/* Companion attribution */}
+        <p style={{
+          fontSize: 10,
+          color: C.faint,
+          textAlign: "center",
+          fontFamily: FONT_SANS,
+          letterSpacing: "0.06em",
+          textTransform: "uppercase" as const,
+          margin: "18px 0 0",
+        }}>
+          from your companion
+        </p>
       </div>
       {showShareM && (
         <ShareCardModal card={card} onClose={() => setShowShareM(false)} />
