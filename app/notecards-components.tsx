@@ -4132,58 +4132,22 @@ export function ContextualHint({
   );
 }
 
-// ─── CompanionLetter ─────────────────────────────────────────────────────────
-function CompanionLetter({ children }: { children: React.ReactNode }) {
-  const C = useC();
-  const mob = useContext(MobileCtx);
-  const isDark = C.base === DARK.base;
-  return (
-    <div style={{
-      display: "flex",
-      justifyContent: "center",
-      padding: mob ? "20px 12px" : "28px 16px",
-      animation: "fadeIn 0.6s ease both",
-    }}>
-      <div style={{
-        maxWidth: 440,
-        width: "100%",
-        background: isDark
-          ? "linear-gradient(180deg, #1e1d1a 0%, #1a1916 100%)"
-          : "linear-gradient(180deg, #faf9f6 0%, #f6f4f0 100%)",
-        border: `1px solid ${isDark ? "#2a2925" : "#e8e6e1"}`,
-        borderRadius: 10,
-        padding: mob ? "28px 24px" : "36px 32px",
-        textAlign: "center" as const,
-      }}>
-        {children}
-        <p style={{
-          fontSize: 10,
-          color: C.faint,
-          textAlign: "center",
-          fontFamily: FONT_SANS,
-          letterSpacing: "0.06em",
-          textTransform: "uppercase" as const,
-          margin: "14px 0 0",
-        }}>
-          from your companion
-        </p>
-      </div>
-    </div>
-  );
-}
-
 // ─── SeedCard ────────────────────────────────────────────────────────────────
 export function SeedCard() {
   const C = useC();
   const mob = useContext(MobileCtx);
   return (
-    <CompanionLetter>
+    <div style={{
+      padding: mob ? "16px 0" : "20px 0",
+      opacity: 0.6,
+      animation: "fadeIn 0.5s ease both",
+    }}>
       <div style={{ width: 20, height: 1, background: C.border, margin: "0 auto 16px" }} />
       <p style={{
         fontFamily: FONT_SERIF,
         fontStyle: "italic",
-        fontSize: mob ? 16 : 19,
-        lineHeight: 1.75,
+        fontSize: mob ? 15 : 17,
+        lineHeight: 1.7,
         color: C.ink,
         textAlign: "center",
         maxWidth: 380,
@@ -4191,17 +4155,28 @@ export function SeedCard() {
       }}>
         &ldquo;A book must be the axe for the frozen sea within us.&rdquo;
       </p>
-      <div style={{ width: 20, height: 1, background: C.border, margin: "12px auto 14px" }} />
       <p style={{
-        fontSize: 12,
-        color: C.muted,
+        fontSize: 11,
+        color: C.faint,
         textAlign: "center",
         fontFamily: FONT_SANS,
-        margin: "0 auto",
+        margin: "0 auto 4px",
       }}>
         Franz Kafka &middot; <em>Letters to Friends</em>
       </p>
-    </CompanionLetter>
+      <p style={{
+        fontSize: 10,
+        color: C.faint,
+        textAlign: "center",
+        fontFamily: FONT_SANS,
+        letterSpacing: "0.05em",
+        textTransform: "uppercase" as const,
+        margin: "4px auto 0",
+      }}>
+        from your companion
+      </p>
+      <div style={{ width: 20, height: 1, background: C.border, margin: "16px auto 0" }} />
+    </div>
   );
 }
 
