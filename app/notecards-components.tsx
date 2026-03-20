@@ -294,6 +294,36 @@ export const COMMANDS = [
   },
 ];
 
+// ─── Feature Unlock Tiers ─────────────────────────────────────────────────────
+export const FEATURE_TIERS: { cmd: string; threshold: number; unlockMsg: string }[] = [
+  { cmd: "/library", threshold: 1, unlockMsg: "Your library awaits" },
+  { cmd: "/random", threshold: 3, unlockMsg: "Pull a surprise quote from your library" },
+  { cmd: "/find", threshold: 5, unlockMsg: "Search across your growing collection" },
+  { cmd: "/read", threshold: 10, unlockMsg: "Curated reading sessions from your quotes" },
+  { cmd: "/write", threshold: 15, unlockMsg: "Writing prompts drawn from your library" },
+];
+
+export function isFeatureLocked(cmd: string, cardCount: number): boolean {
+  const tier = FEATURE_TIERS.find((t) => t.cmd === cmd);
+  if (!tier) return false;
+  return cardCount < tier.threshold;
+}
+
+export function getNextUnlock(
+  cardCount: number,
+): (typeof FEATURE_TIERS)[number] | null {
+  return FEATURE_TIERS.find((t) => cardCount < t.threshold) ?? null;
+}
+
+export function getNewlyUnlocked(
+  prevCount: number,
+  newCount: number,
+): (typeof FEATURE_TIERS)[number][] {
+  return FEATURE_TIERS.filter(
+    (t) => prevCount < t.threshold && newCount >= t.threshold,
+  );
+}
+
 export function getPlaceholder(
   cards: CardLike[],
   flowStage: string | null
@@ -2863,20 +2893,30 @@ export function BookPalette({
 export function CommandPalette({
   query,
   onSelect,
+  cardCount = Infinity,
 }: {
   query: string;
   onSelect: (cmd: string) => void;
+  cardCount?: number;
 }) {
   const C = useC();
   const mob = useContext(MobileCtx); const T = makeT(C, mob);
   const filtered = useMemo(
-    () =>
-      COMMANDS.filter(
+    () => {
+      const matched = COMMANDS.filter(
         (c) =>
           c.cmd.includes(query.toLowerCase()) ||
           c.desc.toLowerCase().includes(query.slice(1).toLowerCase())
-      ),
-    [query]
+      );
+      // Sort: unlocked first, locked last
+      return matched.sort((a, b) => {
+        const aLocked = isFeatureLocked(a.cmd, cardCount);
+        const bLocked = isFeatureLocked(b.cmd, cardCount);
+        if (aLocked === bLocked) return 0;
+        return aLocked ? 1 : -1;
+      });
+    },
+    [query, cardCount]
   );
   if (!filtered.length) return null;
   return (
@@ -2907,64 +2947,76 @@ export function CommandPalette({
         <span style={T.label}>Commands</span>
       </div>
       <div style={{ maxHeight: mob ? 200 : 268, overflowY: "auto" }}>
-        {filtered.map((c, i) => (
-          <button
-            key={c.cmd}
-            onMouseDown={(e) => {
-              e.preventDefault();
-              onSelect(c.cmd);
-            }}
-            style={{
-              width: "100%",
-              textAlign: "left",
-              padding: "10px 16px",
-              background: "transparent",
-              border: "none",
-              borderBottom:
-                i < filtered.length - 1
-                  ? `1px solid ${C.border}`
-                  : "none",
-              cursor: "pointer",
-              fontFamily: FONT_SANS,
-              transition: "background 0.1s",
-            }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.background = C.surface)
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.background = "transparent")
-            }
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <span
-                style={{
-                  fontSize: 14,
-                  width: 20,
-                  textAlign: "center",
-                  color: C.faint,
-                  flexShrink: 0,
-                }}
-              >
-                {c.icon}
-              </span>
-              <div>
+        {filtered.map((c, i) => {
+          const locked = isFeatureLocked(c.cmd, cardCount);
+          const tier = FEATURE_TIERS.find((t) => t.cmd === c.cmd);
+          const remaining = tier ? tier.threshold - cardCount : 0;
+          return (
+            <button
+              key={c.cmd}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                if (!locked) onSelect(c.cmd);
+              }}
+              style={{
+                width: "100%",
+                textAlign: "left",
+                padding: "10px 16px",
+                background: "transparent",
+                border: "none",
+                borderBottom:
+                  i < filtered.length - 1
+                    ? `1px solid ${C.border}`
+                    : "none",
+                cursor: locked ? "default" : "pointer",
+                fontFamily: FONT_SANS,
+                transition: "background 0.1s",
+                opacity: locked ? 0.4 : 1,
+              }}
+              onMouseEnter={(e) => {
+                if (!locked) e.currentTarget.style.background = C.surface;
+              }}
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.background = "transparent")
+              }
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <span
                   style={{
-                    fontSize: 13,
-                    color: C.ink,
-                    fontWeight: 500,
+                    fontSize: 14,
+                    width: 20,
+                    textAlign: "center",
+                    color: C.faint,
+                    flexShrink: 0,
                   }}
                 >
-                  {c.cmd}{" "}
+                  {locked ? "🔒" : c.icon}
                 </span>
-                <span style={{ fontSize: 13, color: C.muted }}>
-                  {c.hint}
-                </span>
-                <div style={{ ...T.caption, marginTop: 1 }}>{c.desc}</div>
+                <div>
+                  <span
+                    style={{
+                      fontSize: 13,
+                      color: locked ? C.muted : C.ink,
+                      fontWeight: 500,
+                    }}
+                  >
+                    {c.cmd}{" "}
+                  </span>
+                  {!locked && (
+                    <span style={{ fontSize: 13, color: C.muted }}>
+                      {c.hint}
+                    </span>
+                  )}
+                  <div style={{ ...T.caption, marginTop: 1 }}>
+                    {locked
+                      ? `${remaining} card${remaining === 1 ? "" : "s"} to unlock`
+                      : c.desc}
+                  </div>
+                </div>
               </div>
-            </div>
-          </button>
-        ))}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -4287,6 +4339,73 @@ export function MilestoneCard({ totalQuotes, totalBooks, onDismiss }: {
         fontFamily: FONT_SANS,
       }}>
         {sub}
+      </p>
+      <div style={{ width: 24, height: 1, background: C.border, margin: "24px auto 0" }} />
+    </div>
+  );
+}
+
+// ─── FeatureUnlockCard ────────────────────────────────────────────────────────
+export function FeatureUnlockCard({
+  feature,
+}: {
+  feature: { cmd: string; unlockMsg: string; threshold: number };
+}) {
+  const C = useC();
+  const mob = useContext(MobileCtx);
+  const command = COMMANDS.find((c) => c.cmd === feature.cmd);
+  return (
+    <div
+      style={{
+        padding: mob ? "28px 0" : "40px 0",
+        animation: "fadeIn 0.6s ease both",
+        textAlign: "center",
+      }}
+    >
+      <div style={{ width: 24, height: 1, background: C.border, margin: "0 auto 24px" }} />
+      <p style={{
+        fontFamily: FONT_SERIF,
+        fontSize: mob ? 17 : 20,
+        fontWeight: 400,
+        color: C.ink,
+        marginBottom: 12,
+        fontStyle: "italic",
+      }}>
+        A new door opens
+      </p>
+      <div style={{
+        background: C.surface,
+        border: `1px solid ${C.border}`,
+        borderRadius: 10,
+        padding: "16px 20px",
+        maxWidth: 320,
+        margin: "0 auto 12px",
+      }}>
+        <p style={{
+          fontSize: 16,
+          fontWeight: 600,
+          color: C.ink,
+          fontFamily: FONT_SANS,
+          marginBottom: 4,
+        }}>
+          {command?.icon ? `${command.icon} ` : ""}{feature.cmd}
+        </p>
+        <p style={{
+          fontSize: 13,
+          color: C.muted,
+          fontFamily: FONT_SANS,
+          margin: 0,
+        }}>
+          {feature.unlockMsg}
+        </p>
+      </div>
+      <p style={{
+        fontSize: 11,
+        color: C.faint,
+        fontFamily: FONT_SANS,
+        letterSpacing: "0.04em",
+      }}>
+        type {feature.cmd} to try it
       </p>
       <div style={{ width: 24, height: 1, background: C.border, margin: "24px auto 0" }} />
     </div>
